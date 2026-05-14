@@ -1,13 +1,4 @@
 (function(){
-  // m.youtube.com → www.youtube.com リダイレクト
-  if (location.host !== 'www.youtube.com') {
-    var u = new URL(location);
-    u.host = 'www.youtube.com';
-    u.searchParams.set('app', 'desktop');
-    location.href = u;
-    return;
-  }
-
   var b = document.querySelector('button[aria-label*="文字起こし"]');
   if (b) b.click();
 
@@ -49,11 +40,12 @@
     var q = '以下のYouTube動画の文字起こしを要約してください\n\n' + text;
     var prompt2 = '以下に貼り付けるYouTube動画(' + title + ')の文字起こしを要約してください。本文はクリップボードにコピー済みなので、この後すぐ貼り付けます。';
 
+    // ボタン共通スタイル。5ボタンになったので各20vwずつ。
     var st = 'position:fixed;top:0;height:10vh;z-index:2147483647;font-size:13px;border:1px solid #888;border-radius:0;box-sizing:border-box;';
 
     var bs = document.createElement('button');
     bs.textContent = '全選択';
-    bs.style.cssText = st + 'left:0;width:25vw;background:#eee;';
+    bs.style.cssText = st + 'left:0;width:20vw;background:#eee;';
     bs.onclick = function(){
       ta.value = q;
       ta.focus();
@@ -63,7 +55,7 @@
 
     var bcl = document.createElement('button');
     bcl.textContent = 'Claude';
-    bcl.style.cssText = st + 'left:25vw;width:25vw;background:#d97757;color:#fff;';
+    bcl.style.cssText = st + 'left:20vw;width:20vw;background:#d97757;color:#fff;';
     bcl.onclick = function(){
       var u = 'https://claude.ai/new?q=' + encodeURIComponent(q);
       if (u.length < 2000) {
@@ -79,7 +71,7 @@
 
     var bgpt = document.createElement('button');
     bgpt.textContent = 'ChatGPT';
-    bgpt.style.cssText = st + 'left:50vw;width:25vw;background:#10a37f;color:#fff;';
+    bgpt.style.cssText = st + 'left:40vw;width:20vw;background:#10a37f;color:#fff;';
     bgpt.onclick = function(){
       var u = 'https://chatgpt.com/?q=' + encodeURIComponent(q);
       if (u.length < 2000) {
@@ -93,11 +85,23 @@
       }
     };
 
+    // Gemini: URLパラメータ未対応のため常にコピー+ページを開く方式
+    var bgm = document.createElement('button');
+    bgm.textContent = 'Gemini';
+    bgm.style.cssText = st + 'left:60vw;width:20vw;background:#1c69d4;color:#fff;';
+    bgm.onclick = function(){
+      ta.value = text;
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); } catch(e) {}
+      window.open('https://gemini.google.com/app', '_blank');
+    };
+
     var bc = document.createElement('button');
     bc.textContent = '閉じる';
-    bc.style.cssText = st + 'right:0;width:25vw;background:#eee;';
+    bc.style.cssText = st + 'right:0;width:20vw;background:#eee;';
     bc.onclick = function(){
-      ta.remove(); bs.remove(); bcl.remove(); bgpt.remove(); bc.remove();
+      ta.remove(); bs.remove(); bcl.remove(); bgpt.remove(); bgm.remove(); bc.remove();
     };
 
     var ta = document.createElement('textarea');
@@ -108,6 +112,7 @@
     document.body.appendChild(bs);
     document.body.appendChild(bcl);
     document.body.appendChild(bgpt);
+    document.body.appendChild(bgm);
     document.body.appendChild(bc);
     ta.focus();
     ta.select();
