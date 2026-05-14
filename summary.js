@@ -50,9 +50,9 @@
     var prompt2 = '以下に貼り付けるYouTube動画(' + title + ')の文字起こしを要約してください。本文はクリップボードにコピー済みなので、この後すぐ貼り付けます。';
 
     // ボタン共通スタイル
-    // margin:0 と box-sizing:border-box でデフォルトCSSの影響を排除
-    // z-indexはtextareaより1大きくしてクリックを確実に拾う
-    var st = 'position:fixed;top:0;height:10vh;z-index:2147483647;font-size:13px;border:1px solid #888;border-radius:0;box-sizing:border-box;margin:0;';
+    // ボーダーなし、色差で区別。
+    // 右側だけ線にしたい場合は 'border:none' を 'border:none;border-right:1px solid #888' に。
+    var st = 'position:fixed;top:0;height:10vh;z-index:2147483647;font-size:13px;border:none;border-radius:0;box-sizing:border-box;margin:0;';
 
     var bs = document.createElement('button');
     bs.textContent = '全選択';
@@ -96,7 +96,6 @@
       }
     };
 
-    // Gemini: URLパラメータ未対応のため常にコピー+ページを開く方式
     var bgm = document.createElement('button');
     bgm.textContent = 'Gemini';
     bgm.style.cssText = st + 'left:60vw;width:20vw;background:#1c69d4;color:#fff;';
@@ -117,8 +116,6 @@
 
     var ta = document.createElement('textarea');
     ta.value = text;
-    // textareaも box-sizing と margin:0 で枠ピッタリに収める
-    // z-indexはボタンより1小さくして競合を避ける
     ta.style.cssText = 'position:fixed;top:10vh;left:0;width:100vw;height:90vh;z-index:2147483646;font-size:13px;box-sizing:border-box;margin:0;';
 
     document.body.appendChild(ta);
