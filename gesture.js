@@ -2,6 +2,10 @@
   var v = document.querySelector('video');
   if (!v) return;
 
+  // 維持したい再生速度。ユーザーが速度を変更したらここも更新される。
+  // 1秒ごとの監視で、現在の速度がこれと違っていたら戻す。
+  var tgtRate = v.playbackRate;
+
   // ============ コントロールパネル ============
   var d = document.createElement('div');
   d.style.cssText = 'position:fixed;top:10px;left:0;z-index:999999;background:#222;padding:3px 6px;border-radius:8px;color:#fff';
@@ -16,6 +20,7 @@
   l.addEventListener('click', function(){
     var v = document.querySelector('video');
     if (v) v.playbackRate = 1;
+    tgtRate = 1;  // 目標速度も更新
     l.textContent = '1x';
   });
 
@@ -69,7 +74,9 @@
   tb.max = 1000;
   tb.step = 1;
   tb.value = 0;
-  tb.style.cssText = 'width:300px;display:none;margin-top:4px';
+  // シークバーをデフォルトで表示。
+  // 非表示に戻したい場合は 'display:block' を 'display:none' に変える。
+  tb.style.cssText = 'width:300px;display:block;margin-top:4px';
   tb.addEventListener('input', function(){
     var cv = gv();
     if (cv && cv.duration && isFinite(cv.duration)) {
@@ -105,17 +112,29 @@
   });
 
   // ============ オーバーレイ ============
-  // 上半分: 速度変更・タップ系
   var ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;z-index:999998;background:transparent;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent';
 
-  // 中央: シーク用
   var ov2 = document.createElement('div');
   ov2.style.cssText = 'position:fixed;z-index:999997;background:transparent;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent';
 
+  // video要素を取得。新しい動画に切り替わった瞬間(loadstart)に
+  // 目標速度を1xにリセットするリスナーを仕掛ける。
+  // _bmHookマーカーで同じvideo要素への重複登録を防ぐ。
   function gv(){
     var nv = document.querySelector('video');
-    if (nv) v = nv;
+    if (nv) {
+      if (nv !== v || !nv._bmHook) {
+        v = nv;
+        try {
+          nv.addEventListener('loadstart', function(){
+            tgtRate = 1;
+            l.textContent = '1x';
+          });
+          nv._bmHook = 1;
+        } catch(er) {}
+      }
+    }
     return v;
   }
 
@@ -206,11 +225,13 @@
     var cv = gv();
     if (uturn) {
       cv.playbackRate = 1;
+      tgtRate = 1;  // 目標速度も更新
       l.textContent = '1x';
     } else {
       var nr = Math.max(0, Math.min(5, sr + dx / 200));
       nr = Math.round(nr * 10) / 10;
       cv.playbackRate = nr;
+      tgtRate = nr;  // 目標速度も更新
       l.textContent = nr + 'x';
     }
   });
@@ -362,7 +383,15 @@
       var p2 = ds < 10 ? '0' + ds : ds;
       tm.textContent = cm + ':' + p1 + '/' + dm + ':' + p2;
       if (tb.style.display !== 'none' && dur > 0) tb.value = cur / dur * 1000;
-      var pr = Math.round(cv.playbackRate * 10) / 10, prT = pr + 'x';
+
+      // 速度復帰: 現在速度が目標と0.05以上ズレていたら戻す
+      // try/catchはvideo要素が一時的に無効な瞬間にエラーが出ても落ちないため
+      var pr = Math.round(cv.playbackRate * 10) / 10;
+      if (Math.abs(pr - tgtRate) > 0.05) {
+        try { cv.playbackRate = tgtRate; } catch(er) {}
+        pr = tgtRate;
+      }
+      var prT = pr + 'x';
       if (l.textContent !== prT) l.textContent = prT;
     }
   }, 1000);
