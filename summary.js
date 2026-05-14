@@ -86,11 +86,12 @@
     };
 
     // Gemini: URLパラメータ未対応のため常にコピー+ページを開く方式
+    // 本文だけでなくプロンプトも含めてコピーするので、貼り付けるだけで完結
     var bgm = document.createElement('button');
     bgm.textContent = 'Gemini';
     bgm.style.cssText = st + 'left:60vw;width:20vw;background:#1c69d4;color:#fff;';
     bgm.onclick = function(){
-      ta.value = text;
+      ta.value = q;
       ta.focus();
       ta.select();
       try { document.execCommand('copy'); } catch(e) {}
