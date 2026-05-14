@@ -1,4 +1,14 @@
 (function(){
+  // m.youtube.com → www.youtube.com リダイレクト
+  // ローダーを短くするため、リダイレクト処理は本体側に置いている
+  if (location.host !== 'www.youtube.com') {
+    var u = new URL(location);
+    u.host = 'www.youtube.com';
+    u.searchParams.set('app', 'desktop');
+    location.href = u;
+    return;
+  }
+
   var b = document.querySelector('button[aria-label*="文字起こし"]');
   if (b) b.click();
 
