@@ -6,6 +6,9 @@
   // 1秒ごとの監視で、現在の速度がこれと違っていたら戻す。
   var tgtRate = v.playbackRate;
 
+  // 現在の動画ID(URLのv=パラメータ)。動画切り替え検出に使う。
+  var lastVid = new URLSearchParams(location.search).get('v');
+
   // ============ コントロールパネル ============
   var d = document.createElement('div');
   d.style.cssText = 'position:fixed;top:10px;left:0;z-index:999999;background:#222;padding:3px 6px;border-radius:8px;color:#fff';
@@ -119,7 +122,8 @@
   ov2.style.cssText = 'position:fixed;z-index:999997;background:transparent;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent';
 
   // video要素を取得。新しい動画に切り替わった瞬間(loadstart)に
-  // 目標速度を1xにリセットするリスナーを仕掛ける。
+  // 動画IDが変わっていれば目標速度を1xにリセットするリスナーを仕掛ける。
+  // loadstartはタブ復帰時にも発火するため、ID比較で本当の切り替えかを判定。
   // _bmHookマーカーで同じvideo要素への重複登録を防ぐ。
   function gv(){
     var nv = document.querySelector('video');
@@ -128,8 +132,12 @@
         v = nv;
         try {
           nv.addEventListener('loadstart', function(){
-            tgtRate = 1;
-            l.textContent = '1x';
+            var curVid = new URLSearchParams(location.search).get('v');
+            if (curVid !== lastVid) {
+              lastVid = curVid;
+              tgtRate = 1;
+              l.textContent = '1x';
+            }
           });
           nv._bmHook = 1;
         } catch(er) {}
