@@ -31,8 +31,6 @@
     return m ? m[0] : null;
   }
 
-  var added = 0, viaData = 0, viaLabel = 0;
-
   document.querySelectorAll('a[href*="/watch?v="]').forEach(function (a) {
     var m = a.href.match(/[?&]v=([^&]+)/);
     if (!m) return;
@@ -47,13 +45,10 @@
     if (!c || c.querySelector('.bm-age')) return;
 
     var t = map[m[1]];
-    if (t) {
-      viaData++;
-    } else {
+    if (!t) {
       t = labelToAge(a.getAttribute('aria-label')) ||
           labelToAge(c.getAttribute('aria-label')) ||
           labelToAge(c.textContent);
-      if (t) viaLabel++;
     }
     if (!t) return;
 
@@ -64,13 +59,5 @@
 
     var meta = c.querySelector('[class*="metadata"],[class*="byline"]') || a.parentNode;
     meta.appendChild(span);
-    added++;
   });
-
-  alert(
-    '追加:' + added +
-    ' /データ経由:' + viaData +
-    ' /label経由:' + viaLabel +
-    ' /map件数:' + Object.keys(map).length
-  );
 })();
