@@ -2,37 +2,31 @@
   var v = document.querySelector('video');
   if (!v) return;
 
-  // 維持したい再生速度。ユーザーが速度を変更したらここも更新される。
-  // 1秒ごとの監視で、現在の速度がこれと違っていたら戻す。
   var tgtRate = v.playbackRate;
-
-  // 現在の動画ID(URLのv=パラメータ)。動画切り替え検出に使う。
   var lastVid = new URLSearchParams(location.search).get('v');
+  // 透過モードフラグ。trueの時はオーバーレイがクリックを受け付けない。
+  var pass = false;
 
-  // ============ コントロールパネル ============
   var d = document.createElement('div');
   d.style.cssText = 'position:fixed;top:10px;left:0;z-index:999999;background:#222;padding:3px 6px;border-radius:8px;color:#fff';
 
   var r = document.createElement('div');
-  r.style.cssText = 'display:flex;align-items:center;width:300px';
+  r.style.cssText = 'display:flex;align-items:center;width:340px';
 
-  // 速度表示(クリックで1xに戻す)
   var l = document.createElement('div');
   l.textContent = v.playbackRate + 'x';
   l.style.cssText = 'cursor:pointer;flex:1;text-align:center;padding:2px 0;font-size:12px';
   l.addEventListener('click', function(){
     var v = document.querySelector('video');
     if (v) v.playbackRate = 1;
-    tgtRate = 1;  // 目標速度も更新
+    tgtRate = 1;
     l.textContent = '1x';
   });
 
-  // 時間表示
   var tm = document.createElement('div');
   tm.style.cssText = 'flex:2;text-align:center;padding:2px 0;font-size:11px;cursor:pointer';
   tm.textContent = '0:00/0:00';
 
-  // PiPボタン
   var p = document.createElement('button');
   p.textContent = 'PiP';
   p.style.cssText = 'flex:1;margin:0 4px;padding:2px 0';
@@ -45,15 +39,35 @@
     }
   });
 
-  // ヘルプボタン
+  // 透過モードトグルボタン
+  // 通常時は👁、透過中は🚫(赤背景)。コメント欄がせり出した時などに使う。
+  var bp = document.createElement('button');
+  bp.textContent = '👁';
+  bp.style.cssText = 'flex:1;margin-right:4px;padding:2px 0';
+  bp.addEventListener('click', function(){
+    pass = !pass;
+    if (pass) {
+      ov.style.pointerEvents = 'none';
+      ov2.style.pointerEvents = 'none';
+      bp.textContent = '🚫';
+      bp.style.background = '#c33';
+      bp.style.color = '#fff';
+    } else {
+      ov.style.pointerEvents = 'auto';
+      ov2.style.pointerEvents = 'auto';
+      bp.textContent = '👁';
+      bp.style.background = '';
+      bp.style.color = '';
+    }
+  });
+
   var hb = document.createElement('button');
   hb.textContent = '?';
   hb.style.cssText = 'flex:1;margin-right:4px;padding:2px 0';
   hb.addEventListener('click', function(){
-    alert('上50% 左右端20%長押し：戻る・進む\n上50% 左右端20%タップ：YouTubeへ\n上50% スワイプ：速度変更\n上50% シングルタップ：再生・停止\n上50% ダブルタップ：PiP\n中央縦横20%タップ：YouTubeへ\n中40%スライド：小刻みシーク\n中40%シングルタップ：再生・停止\n下10%：YouTubeのシークバー\n時間タップ：シークバー表示・非表示');
+    alert('上50% 左右端20%長押し：戻る・進む\n上50% 左右端20%タップ：YouTubeへ\n上50% スワイプ：速度変更\n上50% シングルタップ：再生・停止\n上50% ダブルタップ：PiP\n中央縦横20%タップ：YouTubeへ\n中40%スライド：小刻みシーク\n中40%シングルタップ：再生・停止\n下10%：YouTubeのシークバー\n時間タップ：シークバー表示・非表示\n👁ボタン：オーバーレイ一時無効化');
   });
 
-  // 閉じるボタン
   var x = document.createElement('button');
   x.textContent = '✕';
   x.style.cssText = 'flex:1;padding:2px 0';
@@ -67,19 +81,18 @@
   r.appendChild(l);
   r.appendChild(tm);
   r.appendChild(p);
+  r.appendChild(bp);
   r.appendChild(hb);
   r.appendChild(x);
 
-  // シークバー(時間タップで表示切替)
   var tb = document.createElement('input');
   tb.type = 'range';
   tb.min = 0;
   tb.max = 1000;
   tb.step = 1;
   tb.value = 0;
-  // シークバーをデフォルトで表示。
-  // 非表示に戻したい場合は 'display:block' を 'display:none' に変える。
-  tb.style.cssText = 'width:300px;display:block;margin-top:4px';
+  // シークバーをデフォルトで表示。非表示にしたい場合は 'display:block' を 'display:none' に。
+  tb.style.cssText = 'width:340px;display:block;margin-top:4px';
   tb.addEventListener('input', function(){
     var cv = gv();
     if (cv && cv.duration && isFinite(cv.duration)) {
@@ -90,7 +103,6 @@
     tb.style.display = tb.style.display === 'none' ? 'block' : 'none';
   });
 
-  // パネルのドラッグ移動
   var a, b, c, e, di = null;
   r.addEventListener('pointerdown', function(t){
     if (t.button && t.button !== 0) return;
@@ -114,17 +126,12 @@
     if (t.pointerId === di) di = null;
   });
 
-  // ============ オーバーレイ ============
   var ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;z-index:999998;background:transparent;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent';
 
   var ov2 = document.createElement('div');
   ov2.style.cssText = 'position:fixed;z-index:999997;background:transparent;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent';
 
-  // video要素を取得。新しい動画に切り替わった瞬間(loadstart)に
-  // 動画IDが変わっていれば目標速度を1xにリセットするリスナーを仕掛ける。
-  // loadstartはタブ復帰時にも発火するため、ID比較で本当の切り替えかを判定。
-  // _bmHookマーカーで同じvideo要素への重複登録を防ぐ。
   function gv(){
     var nv = document.querySelector('video');
     if (nv) {
@@ -159,7 +166,6 @@
   }
   pos();
 
-  // ============ 上半分オーバーレイ ============
   var sx, sy, sr, sw = false, passed = false, mx, mn, uturn = false, lt = 0, hold = null, holding = false, cz = false, pi = null;
 
   function clearHold(){
@@ -233,13 +239,13 @@
     var cv = gv();
     if (uturn) {
       cv.playbackRate = 1;
-      tgtRate = 1;  // 目標速度も更新
+      tgtRate = 1;
       l.textContent = '1x';
     } else {
       var nr = Math.max(0, Math.min(5, sr + dx / 200));
       nr = Math.round(nr * 10) / 10;
       cv.playbackRate = nr;
-      tgtRate = nr;  // 目標速度も更新
+      tgtRate = nr;
       l.textContent = nr + 'x';
     }
   });
@@ -255,7 +261,8 @@
       holding = false;
       passed = true;
       ov.style.pointerEvents = 'none';
-      setTimeout(function(){ ov.style.pointerEvents = 'auto'; }, 100);
+      // 透過モード中は戻さない
+      setTimeout(function(){ if (!pass) ov.style.pointerEvents = 'auto'; }, 100);
       return;
     }
     if (!sw) {
@@ -289,7 +296,8 @@
           el.dispatchEvent(ev2);
           el.dispatchEvent(ev3);
         }
-        setTimeout(function(){ ov.style.pointerEvents = 'auto'; }, 100);
+        // YouTubeのダブルタップ検出時間を確保するため300ms。透過モード中は戻さない。
+        setTimeout(function(){ if (!pass) ov.style.pointerEvents = 'auto'; }, 300);
         return;
       }
       var cv = gv();
@@ -310,7 +318,6 @@
     }
   });
 
-  // ============ 中央オーバーレイ(シーク) ============
   var sx2, st2, sw2 = false, passed2 = false, pi2 = null;
 
   ov2.addEventListener('pointerdown', function(t){
@@ -363,7 +370,6 @@
     if (t.pointerId === pi2) pi2 = null;
   });
 
-  // ============ 組み立て・初期化 ============
   document.body.appendChild(ov);
   document.body.appendChild(ov2);
   d.appendChild(r);
@@ -376,7 +382,6 @@
     d.style.left = (vr.left + vr.width / 2 - dw / 2) + 'px';
   }, 50);
 
-  // 1秒ごとの更新
   var t = setInterval(function(){
     pos();
     var cv = gv();
@@ -392,8 +397,6 @@
       tm.textContent = cm + ':' + p1 + '/' + dm + ':' + p2;
       if (tb.style.display !== 'none' && dur > 0) tb.value = cur / dur * 1000;
 
-      // 速度復帰: 現在速度が目標と0.05以上ズレていたら戻す
-      // try/catchはvideo要素が一時的に無効な瞬間にエラーが出ても落ちないため
       var pr = Math.round(cv.playbackRate * 10) / 10;
       if (Math.abs(pr - tgtRate) > 0.05) {
         try { cv.playbackRate = tgtRate; } catch(er) {}
