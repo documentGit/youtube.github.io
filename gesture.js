@@ -65,7 +65,7 @@
   hb.textContent = '?';
   hb.style.cssText = 'flex:1;margin-right:4px;padding:2px 0';
   hb.addEventListener('click', function(){
-    alert('上50% 左右端20%長押し：戻る・進む\n上50% 左右端20%タップ：YouTubeへ\n上50% スワイプ：速度変更\n上50% シングルタップ：再生・停止\n上50% ダブルタップ：PiP\n中央縦横20%タップ：YouTubeへ\n中40%スライド：小刻みシーク\n中40%シングルタップ：再生・停止\n下10%：YouTubeのシークバー\n時間タップ：シークバー表示・非表示\n👁ボタン：オーバーレイ一時無効化');
+    alert('上50% スワイプ：速度変更\n上50% スワイプUターン：1xに戻す\n上50% 左右端20%長押し：戻る・進む(連続)\n中40% スライド：小刻みシーク\n下10%：YouTubeのシークバー\nタップ・ダブルタップ：YouTubeネイティブに任せる\n時間タップ：シークバー表示・非表示\n👁ボタン：オーバーレイ一時無効化');
   });
 
   var x = document.createElement('button');
@@ -166,7 +166,9 @@
   }
   pos();
 
-  var sx, sy, sr, sw = false, passed = false, mx, mn, uturn = false, lt = 0, hold = null, holding = false, cz = false, pi = null;
+  // ============ 上半分オーバーレイ ============
+  // スワイプ:速度変更、左右端長押し:連続シーク、それ以外はYouTubeへ転送
+  var sx, sy, sr, sw = false, passed = false, mx, mn, uturn = false, hold = null, holding = false, pi = null;
 
   function clearHold(){
     if (hold) {
@@ -193,8 +195,6 @@
     clearHold();
     var rect = cv.getBoundingClientRect();
     var rx = (sx - rect.left) / rect.width;
-    var ry = (sy - rect.top) / rect.height;
-    cz = (rx >= 0.4 && rx <= 0.6 && ry >= 0.4 && ry <= 0.6);
     if (rx <= 0.2 || rx >= 0.8) {
       var dir = rx <= 0.2 ? -5 : 5;
       hold = setTimeout(function(){
@@ -216,7 +216,6 @@
     var dy = t.clientY - sy;
     if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
       clearHold();
-      cz = false;
     }
     if (!sw) {
       if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
@@ -257,58 +256,28 @@
     if (t.pointerId !== pi) return;
     pi = null;
     clearHold();
+    // 長押し連続シークが発動していた場合は何もしない(既に処理済み)
     if (holding) {
       holding = false;
-      passed = true;
-      ov.style.pointerEvents = 'none';
-      // 透過モード中は戻さない
-      setTimeout(function(){ if (!pass) ov.style.pointerEvents = 'auto'; }, 100);
       return;
     }
-    if (!sw) {
-      var ex = t.clientX;
-      var ey = t.clientY;
-      var rect = gv().getBoundingClientRect();
-      var rx = (ex - rect.left) / rect.width;
-      var center = (rx > 0.2 && rx < 0.8);
-      var side = (rx <= 0.2 || rx >= 0.8);
-      var now = Date.now();
-      if (!cz && center && now - lt < 350) {
-        lt = 0;
-        var cv = gv();
-        if (document.pictureInPictureElement) {
-          document.exitPictureInPicture();
-        } else if (cv) {
-          cv.requestPictureInPicture();
-        }
-        return;
-      }
-      lt = (!cz && center) ? now : 0;
-      if (cz || side) {
-        passed = true;
-        ov.style.pointerEvents = 'none';
-        var el = document.elementFromPoint(ex, ey);
-        if (el) {
-          var ev1 = new MouseEvent('mousedown', { bubbles: true, clientX: ex, clientY: ey });
-          var ev2 = new MouseEvent('mouseup', { bubbles: true, clientX: ex, clientY: ey });
-          var ev3 = new MouseEvent('click', { bubbles: true, clientX: ex, clientY: ey });
-          el.dispatchEvent(ev1);
-          el.dispatchEvent(ev2);
-          el.dispatchEvent(ev3);
-        }
-        // YouTubeのダブルタップ検出時間を確保するため300ms。透過モード中は戻さない。
-        setTimeout(function(){ if (!pass) ov.style.pointerEvents = 'auto'; }, 300);
-        return;
-      }
-      var cv = gv();
-      if (cv) {
-        if (cv.paused) {
-          cv.play();
-        } else {
-          cv.pause();
-        }
-      }
+    // スワイプ(速度変更)していた場合も何もしない(既に処理済み)
+    if (sw) return;
+    // それ以外(=タップ・ダブルタップ)は全てYouTubeに転送
+    passed = true;
+    ov.style.pointerEvents = 'none';
+    var ex = t.clientX, ey = t.clientY;
+    var el = document.elementFromPoint(ex, ey);
+    if (el) {
+      var ev1 = new MouseEvent('mousedown', { bubbles: true, clientX: ex, clientY: ey });
+      var ev2 = new MouseEvent('mouseup', { bubbles: true, clientX: ex, clientY: ey });
+      var ev3 = new MouseEvent('click', { bubbles: true, clientX: ex, clientY: ey });
+      el.dispatchEvent(ev1);
+      el.dispatchEvent(ev2);
+      el.dispatchEvent(ev3);
     }
+    // YouTubeのダブルタップ検出時間を確保するため300ms。透過モード中は戻さない。
+    setTimeout(function(){ if (!pass) ov.style.pointerEvents = 'auto'; }, 300);
   });
 
   ov.addEventListener('pointercancel', function(t){
@@ -318,7 +287,9 @@
     }
   });
 
-  var sx2, st2, sw2 = false, passed2 = false, pi2 = null;
+  // ============ 中央オーバーレイ(シーク) ============
+  // スライド:小刻みシーク、それ以外はYouTubeへ転送
+  var sx2, st2, sw2 = false, pi2 = null;
 
   ov2.addEventListener('pointerdown', function(t){
     if (t.button && t.button !== 0) return;
@@ -328,12 +299,10 @@
     sx2 = t.clientX;
     st2 = cv.currentTime;
     sw2 = false;
-    passed2 = false;
   });
 
   ov2.addEventListener('pointermove', function(t){
     if (t.pointerId !== pi2) return;
-    if (passed2) return;
     var dx = t.clientX - sx2;
     if (!sw2) {
       if (Math.abs(dx) < 10) return;
@@ -354,16 +323,21 @@
   ov2.addEventListener('pointerup', function(t){
     if (t.pointerId !== pi2) return;
     pi2 = null;
-    if (!sw2) {
-      var cv = gv();
-      if (cv) {
-        if (cv.paused) {
-          cv.play();
-        } else {
-          cv.pause();
-        }
-      }
+    // スライド(シーク)していた場合は何もしない
+    if (sw2) return;
+    // それ以外(=タップ・ダブルタップ)はYouTubeに転送
+    ov2.style.pointerEvents = 'none';
+    var ex = t.clientX, ey = t.clientY;
+    var el = document.elementFromPoint(ex, ey);
+    if (el) {
+      var ev1 = new MouseEvent('mousedown', { bubbles: true, clientX: ex, clientY: ey });
+      var ev2 = new MouseEvent('mouseup', { bubbles: true, clientX: ex, clientY: ey });
+      var ev3 = new MouseEvent('click', { bubbles: true, clientX: ex, clientY: ey });
+      el.dispatchEvent(ev1);
+      el.dispatchEvent(ev2);
+      el.dispatchEvent(ev3);
     }
+    setTimeout(function(){ if (!pass) ov2.style.pointerEvents = 'auto'; }, 300);
   });
 
   ov2.addEventListener('pointercancel', function(t){
