@@ -141,15 +141,18 @@
   pos();
 
   // タップ転送ヘルパー
-  // elementFromPointが返す要素(YouTubeの透明クリックレシーバdiv等)に
-  // イベントを送ると中央プレイボタンが正しく反応しないことがあるため、
-  // 直接video要素にイベントを送る方式に変更。
-  // 上半分・中央40%の両オーバーレイ領域は実質的に動画の上にあるので、
-  // video要素に送れば YouTube が適切にコントロール表示・再生切替を処理する。
+  // elementFromPointが返した要素がYouTubeの透明レシーバdiv(クラスなしDIV)の場合、
+  // それにイベントを送ってもプレイボタンが反応しないので、プレイボタン本体を探して送る。
   function forwardTap(overlay, ex, ey){
     overlay.style.pointerEvents = 'none';
-    var cv = gv();
-    if (cv) {
+    var el = document.elementFromPoint(ex, ey);
+
+    if (el && el.tagName === 'DIV' && !el.className) {
+      var playBtn = document.querySelector('.ytp-play-button');
+      if (playBtn) el = playBtn;
+    }
+
+    if (el) {
       var opts = {
         bubbles: true,
         cancelable: true,
@@ -160,15 +163,15 @@
         isPrimary: true
       };
       try {
-        cv.dispatchEvent(new PointerEvent('pointerdown', opts));
-        cv.dispatchEvent(new MouseEvent('mousedown', opts));
-        cv.dispatchEvent(new PointerEvent('pointerup', opts));
-        cv.dispatchEvent(new MouseEvent('mouseup', opts));
-        cv.dispatchEvent(new MouseEvent('click', opts));
+        el.dispatchEvent(new PointerEvent('pointerdown', opts));
+        el.dispatchEvent(new MouseEvent('mousedown', opts));
+        el.dispatchEvent(new PointerEvent('pointerup', opts));
+        el.dispatchEvent(new MouseEvent('mouseup', opts));
+        el.dispatchEvent(new MouseEvent('click', opts));
       } catch(er) {
-        cv.dispatchEvent(new MouseEvent('mousedown', opts));
-        cv.dispatchEvent(new MouseEvent('mouseup', opts));
-        cv.dispatchEvent(new MouseEvent('click', opts));
+        el.dispatchEvent(new MouseEvent('mousedown', opts));
+        el.dispatchEvent(new MouseEvent('mouseup', opts));
+        el.dispatchEvent(new MouseEvent('click', opts));
       }
     }
     setTimeout(function(){ overlay.style.pointerEvents = 'auto'; }, 400);
