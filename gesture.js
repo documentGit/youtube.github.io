@@ -144,42 +144,40 @@
   // 中央プレイボタンはイベントの二重発火で状態が戻ってしまうため、
   // 当たった場合は特別扱いとしてvideo要素のplay/pauseを直接呼ぶ。
   function forwardTap(overlay, ex, ey){
-    overlay.style.pointerEvents = 'none';
-    var el = document.elementFromPoint(ex, ey);
+  overlay.style.pointerEvents = 'none';
+  var el = document.elementFromPoint(ex, ey);
 
-    if (el && el.closest && el.closest('.ytp-play-button')) {
-      var cv = gv();
-      if (cv) {
-        if (cv.paused) cv.play(); else cv.pause();
-      }
-      setTimeout(function(){ overlay.style.pointerEvents = 'auto'; }, 400);
-      return;
-    }
-
-    if (el) {
-      var opts = {
-        bubbles: true,
-        cancelable: true,
-        clientX: ex,
-        clientY: ey,
-        pointerType: 'mouse',
-        pointerId: 1,
-        isPrimary: true
-      };
-      try {
-        el.dispatchEvent(new PointerEvent('pointerdown', opts));
-        el.dispatchEvent(new MouseEvent('mousedown', opts));
-        el.dispatchEvent(new PointerEvent('pointerup', opts));
-        el.dispatchEvent(new MouseEvent('mouseup', opts));
-        el.dispatchEvent(new MouseEvent('click', opts));
-      } catch(er) {
-        el.dispatchEvent(new MouseEvent('mousedown', opts));
-        el.dispatchEvent(new MouseEvent('mouseup', opts));
-        el.dispatchEvent(new MouseEvent('click', opts));
-      }
-    }
-    setTimeout(function(){ overlay.style.pointerEvents = 'auto'; }, 400);
+  // デバッグ: タップした位置の要素情報をタイトルバーに表示
+  if (el) {
+    var info = el.tagName + '.' + (el.className || '').toString().substring(0, 40);
+    tm.textContent = info;
+    setTimeout(function(){ tm.textContent = '0:00/0:00'; }, 3000);
   }
+
+  if (el) {
+    var opts = {
+      bubbles: true,
+      cancelable: true,
+      clientX: ex,
+      clientY: ey,
+      pointerType: 'mouse',
+      pointerId: 1,
+      isPrimary: true
+    };
+    try {
+      el.dispatchEvent(new PointerEvent('pointerdown', opts));
+      el.dispatchEvent(new MouseEvent('mousedown', opts));
+      el.dispatchEvent(new PointerEvent('pointerup', opts));
+      el.dispatchEvent(new MouseEvent('mouseup', opts));
+      el.dispatchEvent(new MouseEvent('click', opts));
+    } catch(er) {
+      el.dispatchEvent(new MouseEvent('mousedown', opts));
+      el.dispatchEvent(new MouseEvent('mouseup', opts));
+      el.dispatchEvent(new MouseEvent('click', opts));
+    }
+  }
+  setTimeout(function(){ overlay.style.pointerEvents = 'auto'; }, 400);
+}
 
   // ============ 上半分オーバーレイ ============
   var sx, sy, sr, sw = false, passed = false, mx, mn, uturn = false, pi = null;
