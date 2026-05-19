@@ -4,14 +4,13 @@
 
   var tgtRate = v.playbackRate;
   var lastVid = new URLSearchParams(location.search).get('v');
-  // 透過モードフラグ。trueの時はオーバーレイがクリックを受け付けない。
-  var pass = false;
 
+  // ============ コントロールパネル ============
   var d = document.createElement('div');
   d.style.cssText = 'position:fixed;top:10px;left:0;z-index:999999;background:#222;padding:3px 6px;border-radius:8px;color:#fff';
 
   var r = document.createElement('div');
-  r.style.cssText = 'display:flex;align-items:center;width:340px';
+  r.style.cssText = 'display:flex;align-items:center;width:300px';
 
   var l = document.createElement('div');
   l.textContent = v.playbackRate + 'x';
@@ -39,33 +38,11 @@
     }
   });
 
-  // 透過モードトグルボタン
-  // 通常時は👁、透過中は🚫(赤背景)。コメント欄がせり出した時などに使う。
-  var bp = document.createElement('button');
-  bp.textContent = '👁';
-  bp.style.cssText = 'flex:1;margin-right:4px;padding:2px 0';
-  bp.addEventListener('click', function(){
-    pass = !pass;
-    if (pass) {
-      ov.style.pointerEvents = 'none';
-      ov2.style.pointerEvents = 'none';
-      bp.textContent = '🚫';
-      bp.style.background = '#c33';
-      bp.style.color = '#fff';
-    } else {
-      ov.style.pointerEvents = 'auto';
-      ov2.style.pointerEvents = 'auto';
-      bp.textContent = '👁';
-      bp.style.background = '';
-      bp.style.color = '';
-    }
-  });
-
   var hb = document.createElement('button');
   hb.textContent = '?';
   hb.style.cssText = 'flex:1;margin-right:4px;padding:2px 0';
   hb.addEventListener('click', function(){
-    alert('上50% スワイプ：速度変更\n上50% スワイプUターン：1xに戻す\n上50% 左右端20%長押し：戻る・進む(連続)\n中40% スライド：小刻みシーク\n下10%：YouTubeのシークバー\nタップ・ダブルタップ：YouTubeネイティブに任せる\n時間タップ：シークバー表示・非表示\n👁ボタン：オーバーレイ一時無効化');
+    alert('上50% スワイプ：速度変更\n上50% 大きく振り戻し：1xに戻す\n中40% スライド：小刻みシーク\nタップ・ダブルタップ・長押し：YouTubeネイティブ\n時間タップ：シークバー表示・非表示');
   });
 
   var x = document.createElement('button');
@@ -81,7 +58,6 @@
   r.appendChild(l);
   r.appendChild(tm);
   r.appendChild(p);
-  r.appendChild(bp);
   r.appendChild(hb);
   r.appendChild(x);
 
@@ -92,7 +68,7 @@
   tb.step = 1;
   tb.value = 0;
   // シークバーをデフォルトで表示。非表示にしたい場合は 'display:block' を 'display:none' に。
-  tb.style.cssText = 'width:340px;display:block;margin-top:4px';
+  tb.style.cssText = 'width:300px;display:block;margin-top:4px';
   tb.addEventListener('input', function(){
     var cv = gv();
     if (cv && cv.duration && isFinite(cv.duration)) {
@@ -103,6 +79,7 @@
     tb.style.display = tb.style.display === 'none' ? 'block' : 'none';
   });
 
+  // パネルのドラッグ移動
   var a, b, c, e, di = null;
   r.addEventListener('pointerdown', function(t){
     if (t.button && t.button !== 0) return;
@@ -126,6 +103,7 @@
     if (t.pointerId === di) di = null;
   });
 
+  // ============ オーバーレイ ============
   var ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;z-index:999998;background:transparent;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent';
 
@@ -166,17 +144,9 @@
   }
   pos();
 
-  // ============ 上半分オーバーレイ ============
-  // スワイプ:速度変更、左右端長押し:連続シーク、それ以外はYouTubeへ転送
-  var sx, sy, sr, sw = false, passed = false, mx, mn, uturn = false, hold = null, holding = false, pi = null;
-
-  function clearHold(){
-    if (hold) {
-      clearTimeout(hold);
-      clearInterval(hold);
-      hold = null;
-    }
-  }
+  // ============ 上半分オーバーレイ(スワイプによる速度変更のみ) ============
+  // タップ系を全廃。スワイプが成立しなかった場合は元のイベントをYouTubeへ転送。
+  var sx, sy, sr, sw = false, passed = false, mx, mn, uturn = false, pi = null;
 
   ov.addEventListener('pointerdown', function(t){
     if (t.button && t.button !== 0) return;
@@ -191,22 +161,6 @@
     mx = 0;
     mn = 0;
     uturn = false;
-    holding = false;
-    clearHold();
-    var rect = cv.getBoundingClientRect();
-    var rx = (sx - rect.left) / rect.width;
-    if (rx <= 0.2 || rx >= 0.8) {
-      var dir = rx <= 0.2 ? -5 : 5;
-      hold = setTimeout(function(){
-        holding = true;
-        var cv2 = gv();
-        if (cv2) cv2.currentTime += dir;
-        hold = setInterval(function(){
-          var cv3 = gv();
-          if (cv3) cv3.currentTime += dir;
-        }, 500);
-      }, 700);
-    }
   });
 
   ov.addEventListener('pointermove', function(t){
@@ -214,9 +168,6 @@
     if (passed) return;
     var dx = t.clientX - sx;
     var dy = t.clientY - sy;
-    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-      clearHold();
-    }
     if (!sw) {
       if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
       if (Math.abs(dx) > Math.abs(dy)) {
@@ -255,18 +206,13 @@
   ov.addEventListener('pointerup', function(t){
     if (t.pointerId !== pi) return;
     pi = null;
-    clearHold();
-    // 長押し連続シークが発動していた場合は何もしない(既に処理済み)
-    if (holding) {
-      holding = false;
-      return;
-    }
-    // スワイプ(速度変更)していた場合も何もしない(既に処理済み)
-    if (sw) return;
-    // それ以外(=タップ・ダブルタップ)は全てYouTubeに転送
+    if (sw) return;  // スワイプ確定済みなら何もしない
+
+    // スワイプ不成立=タップだった場合、元のイベントをYouTubeへ転送
     passed = true;
+    var ex = t.clientX;
+    var ey = t.clientY;
     ov.style.pointerEvents = 'none';
-    var ex = t.clientX, ey = t.clientY;
     var el = document.elementFromPoint(ex, ey);
     if (el) {
       var ev1 = new MouseEvent('mousedown', { bubbles: true, clientX: ex, clientY: ey });
@@ -276,20 +222,17 @@
       el.dispatchEvent(ev2);
       el.dispatchEvent(ev3);
     }
-    // YouTubeのダブルタップ検出時間を確保するため300ms。透過モード中は戻さない。
-    setTimeout(function(){ if (!pass) ov.style.pointerEvents = 'auto'; }, 300);
+    // ダブルタップの2回目をYouTubeが受け取れるよう、十分に長く透過させる
+    setTimeout(function(){ ov.style.pointerEvents = 'auto'; }, 400);
   });
 
   ov.addEventListener('pointercancel', function(t){
-    if (t.pointerId === pi) {
-      pi = null;
-      clearHold();
-    }
+    if (t.pointerId === pi) pi = null;
   });
 
-  // ============ 中央オーバーレイ(シーク) ============
-  // スライド:小刻みシーク、それ以外はYouTubeへ転送
-  var sx2, st2, sw2 = false, pi2 = null;
+  // ============ 中央オーバーレイ(スライドによるシークのみ) ============
+  // タップ系を全廃。スライドが成立しなかった場合は元のイベントをYouTubeへ転送。
+  var sx2, st2, sw2 = false, passed2 = false, pi2 = null;
 
   ov2.addEventListener('pointerdown', function(t){
     if (t.button && t.button !== 0) return;
@@ -299,10 +242,12 @@
     sx2 = t.clientX;
     st2 = cv.currentTime;
     sw2 = false;
+    passed2 = false;
   });
 
   ov2.addEventListener('pointermove', function(t){
     if (t.pointerId !== pi2) return;
+    if (passed2) return;
     var dx = t.clientX - sx2;
     if (!sw2) {
       if (Math.abs(dx) < 10) return;
@@ -323,11 +268,13 @@
   ov2.addEventListener('pointerup', function(t){
     if (t.pointerId !== pi2) return;
     pi2 = null;
-    // スライド(シーク)していた場合は何もしない
-    if (sw2) return;
-    // それ以外(=タップ・ダブルタップ)はYouTubeに転送
+    if (sw2) return;  // スライド確定済みなら何もしない
+
+    // スライド不成立=タップだった場合、元のイベントをYouTubeへ転送
+    passed2 = true;
+    var ex = t.clientX;
+    var ey = t.clientY;
     ov2.style.pointerEvents = 'none';
-    var ex = t.clientX, ey = t.clientY;
     var el = document.elementFromPoint(ex, ey);
     if (el) {
       var ev1 = new MouseEvent('mousedown', { bubbles: true, clientX: ex, clientY: ey });
@@ -337,13 +284,14 @@
       el.dispatchEvent(ev2);
       el.dispatchEvent(ev3);
     }
-    setTimeout(function(){ if (!pass) ov2.style.pointerEvents = 'auto'; }, 300);
+    setTimeout(function(){ ov2.style.pointerEvents = 'auto'; }, 400);
   });
 
   ov2.addEventListener('pointercancel', function(t){
     if (t.pointerId === pi2) pi2 = null;
   });
 
+  // ============ 組み立て・初期化 ============
   document.body.appendChild(ov);
   document.body.appendChild(ov2);
   d.appendChild(r);
