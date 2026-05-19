@@ -141,43 +141,38 @@
   pos();
 
   // タップ転送ヘルパー
-  // 中央プレイボタンはイベントの二重発火で状態が戻ってしまうため、
-  // 当たった場合は特別扱いとしてvideo要素のplay/pauseを直接呼ぶ。
+  // elementFromPointが返す要素(YouTubeの透明クリックレシーバdiv等)に
+  // イベントを送ると中央プレイボタンが正しく反応しないことがあるため、
+  // 直接video要素にイベントを送る方式に変更。
+  // 上半分・中央40%の両オーバーレイ領域は実質的に動画の上にあるので、
+  // video要素に送れば YouTube が適切にコントロール表示・再生切替を処理する。
   function forwardTap(overlay, ex, ey){
-  overlay.style.pointerEvents = 'none';
-  var el = document.elementFromPoint(ex, ey);
-
-  // デバッグ: タップした位置の要素情報をタイトルバーに表示
-  if (el) {
-    var info = el.tagName + '.' + (el.className || '').toString().substring(0, 40);
-    tm.textContent = info;
-    setTimeout(function(){ tm.textContent = '0:00/0:00'; }, 3000);
-  }
-
-  if (el) {
-    var opts = {
-      bubbles: true,
-      cancelable: true,
-      clientX: ex,
-      clientY: ey,
-      pointerType: 'mouse',
-      pointerId: 1,
-      isPrimary: true
-    };
-    try {
-      el.dispatchEvent(new PointerEvent('pointerdown', opts));
-      el.dispatchEvent(new MouseEvent('mousedown', opts));
-      el.dispatchEvent(new PointerEvent('pointerup', opts));
-      el.dispatchEvent(new MouseEvent('mouseup', opts));
-      el.dispatchEvent(new MouseEvent('click', opts));
-    } catch(er) {
-      el.dispatchEvent(new MouseEvent('mousedown', opts));
-      el.dispatchEvent(new MouseEvent('mouseup', opts));
-      el.dispatchEvent(new MouseEvent('click', opts));
+    overlay.style.pointerEvents = 'none';
+    var cv = gv();
+    if (cv) {
+      var opts = {
+        bubbles: true,
+        cancelable: true,
+        clientX: ex,
+        clientY: ey,
+        pointerType: 'mouse',
+        pointerId: 1,
+        isPrimary: true
+      };
+      try {
+        cv.dispatchEvent(new PointerEvent('pointerdown', opts));
+        cv.dispatchEvent(new MouseEvent('mousedown', opts));
+        cv.dispatchEvent(new PointerEvent('pointerup', opts));
+        cv.dispatchEvent(new MouseEvent('mouseup', opts));
+        cv.dispatchEvent(new MouseEvent('click', opts));
+      } catch(er) {
+        cv.dispatchEvent(new MouseEvent('mousedown', opts));
+        cv.dispatchEvent(new MouseEvent('mouseup', opts));
+        cv.dispatchEvent(new MouseEvent('click', opts));
+      }
     }
+    setTimeout(function(){ overlay.style.pointerEvents = 'auto'; }, 400);
   }
-  setTimeout(function(){ overlay.style.pointerEvents = 'auto'; }, 400);
-}
 
   // ============ 上半分オーバーレイ ============
   var sx, sy, sr, sw = false, passed = false, mx, mn, uturn = false, pi = null;
