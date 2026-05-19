@@ -5,6 +5,7 @@
   var tgtRate = v.playbackRate;
   var lastVid = new URLSearchParams(location.search).get('v');
 
+  // ============ コントロールパネル ============
   var d = document.createElement('div');
   d.style.cssText = 'position:fixed;top:10px;left:0;z-index:999999;background:#222;padding:3px 6px;border-radius:8px;color:#fff';
 
@@ -66,6 +67,7 @@
   tb.max = 1000;
   tb.step = 1;
   tb.value = 0;
+  // シークバーをデフォルトで表示。非表示にしたい場合は 'display:block' を 'display:none' に。
   tb.style.cssText = 'width:300px;display:block;margin-top:4px';
   tb.addEventListener('input', function(){
     var cv = gv();
@@ -100,11 +102,89 @@
     if (t.pointerId === di) di = null;
   });
 
+  // ============ オーバーレイ ============
+  // 初期状態は pointer-events: none で完全素通し。
+  // video要素のpointermove監視でスワイプ判定が成立した瞬間に
+  // pointer-events: auto に切り替えてイベントを乗っ取る。
   var ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;z-index:999998;background:transparent;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent';
+  ov.style.cssText = 'position:fixed;z-index:999998;background:transparent;pointer-events:none;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent';
 
   var ov2 = document.createElement('div');
-  ov2.style.cssText = 'position:fixed;z-index:999997;background:transparent;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent';
+  ov2.style.cssText = 'position:fixed;z-index:999997;background:transparent;pointer-events:none;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent';
+
+  // ジェスチャー状態
+  // mode: null(待機) / 'speed'(速度変更中) / 'seek'(シーク中)
+  var mode = null;
+  var sx = 0, sy = 0, sr = 1, st2 = 0;
+  var mx = 0, mn = 0, uturn = false;
+  var pi = null;
+
+  function resetGesture(){
+    mode = null;
+    pi = null;
+    mx = 0;
+    mn = 0;
+    uturn = false;
+    ov.style.pointerEvents = 'none';
+    ov2.style.pointerEvents = 'none';
+  }
+
+  // video要素のpointer監視。スワイプ判定が成立したらオーバーレイ起動。
+  function attachVideoListeners(nv){
+    nv.addEventListener('pointerdown', function(t){
+      if (t.button && t.button !== 0) return;
+      if (pi !== null) return;
+      pi = t.pointerId;
+      var cv = gv();
+      sx = t.clientX;
+      sy = t.clientY;
+      sr = cv.playbackRate;
+      st2 = cv.currentTime;
+      mx = 0;
+      mn = 0;
+      uturn = false;
+      mode = null;
+    });
+
+    nv.addEventListener('pointermove', function(t){
+      if (t.pointerId !== pi) return;
+      if (mode) return; // モード確定済みはオーバーレイ側で処理
+      var dx = t.clientX - sx;
+      var dy = t.clientY - sy;
+      // 縦の動き優先(スクロール等)、横10px以上で初めてスワイプと判定
+      if (Math.abs(dx) < 10) return;
+      if (Math.abs(dy) > Math.abs(dx)) return;
+
+      // タップ位置がどのエリアか判定
+      var cv = gv();
+      var rect = cv.getBoundingClientRect();
+      var ry = (sy - rect.top) / rect.height;
+
+      if (ry < 0.5) {
+        // 上半分: 速度変更モード
+        mode = 'speed';
+        ov.style.pointerEvents = 'auto';
+        ov.setPointerCapture && ov.setPointerCapture(pi);
+      } else if (ry < 0.9) {
+        // 中央40%(0.5〜0.9): シークモード
+        mode = 'seek';
+        ov2.style.pointerEvents = 'auto';
+        ov2.setPointerCapture && ov2.setPointerCapture(pi);
+      }
+    });
+
+    nv.addEventListener('pointerup', function(t){
+      if (t.pointerId === pi && !mode) {
+        pi = null;
+      }
+    });
+
+    nv.addEventListener('pointercancel', function(t){
+      if (t.pointerId === pi && !mode) {
+        pi = null;
+      }
+    });
+  }
 
   function gv(){
     var nv = document.querySelector('video');
@@ -120,6 +200,7 @@
               l.textContent = '1x';
             }
           });
+          attachVideoListeners(nv);
           nv._bmHook = 1;
         } catch(er) {}
       }
@@ -140,75 +221,12 @@
   }
   pos();
 
-  // タップ転送ヘルパー
-  // elementFromPointが返した要素がYouTubeの透明レシーバdiv(クラスなしDIV)の場合、
-  // それにイベントを送ってもプレイボタンが反応しないので、プレイボタン本体を探して送る。
-  function forwardTap(overlay, ex, ey){
-    overlay.style.pointerEvents = 'none';
-    var el = document.elementFromPoint(ex, ey);
-
-    if (el && el.tagName === 'DIV' && !el.className) {
-      var playBtn = document.querySelector('.ytp-play-button');
-      if (playBtn) el = playBtn;
-    }
-
-    if (el) {
-      var opts = {
-        bubbles: true,
-        cancelable: true,
-        clientX: ex,
-        clientY: ey,
-        pointerType: 'mouse',
-        pointerId: 1,
-        isPrimary: true
-      };
-      try {
-        el.dispatchEvent(new PointerEvent('pointerdown', opts));
-        el.dispatchEvent(new MouseEvent('mousedown', opts));
-        el.dispatchEvent(new PointerEvent('pointerup', opts));
-        el.dispatchEvent(new MouseEvent('mouseup', opts));
-        el.dispatchEvent(new MouseEvent('click', opts));
-      } catch(er) {
-        el.dispatchEvent(new MouseEvent('mousedown', opts));
-        el.dispatchEvent(new MouseEvent('mouseup', opts));
-        el.dispatchEvent(new MouseEvent('click', opts));
-      }
-    }
-    setTimeout(function(){ overlay.style.pointerEvents = 'auto'; }, 400);
-  }
-
-  // ============ 上半分オーバーレイ ============
-  var sx, sy, sr, sw = false, passed = false, mx, mn, uturn = false, pi = null;
-
-  ov.addEventListener('pointerdown', function(t){
-    if (t.button && t.button !== 0) return;
-    if (pi !== null) return;
-    pi = t.pointerId;
-    var cv = gv();
-    sx = t.clientX;
-    sy = t.clientY;
-    sr = cv.playbackRate;
-    sw = false;
-    passed = false;
-    mx = 0;
-    mn = 0;
-    uturn = false;
-  });
-
+  // ============ 上半分オーバーレイ(速度モード時のみアクティブ) ============
   ov.addEventListener('pointermove', function(t){
+    if (mode !== 'speed') return;
     if (t.pointerId !== pi) return;
-    if (passed) return;
-    var dx = t.clientX - sx;
-    var dy = t.clientY - sy;
-    if (!sw) {
-      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        sw = true;
-      } else {
-        return;
-      }
-    }
     t.preventDefault();
+    var dx = t.clientX - sx;
     if (dx > mx) mx = dx;
     if (dx < mn) mn = dx;
     if (!uturn) {
@@ -232,44 +250,19 @@
     }
   });
 
-  ov.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-  ov.addEventListener('selectstart', function(e){ e.preventDefault(); });
-
   ov.addEventListener('pointerup', function(t){
-    if (t.pointerId !== pi) return;
-    pi = null;
-    if (sw) return;
-    passed = true;
-    forwardTap(ov, t.clientX, t.clientY);
+    if (t.pointerId === pi) resetGesture();
   });
-
   ov.addEventListener('pointercancel', function(t){
-    if (t.pointerId === pi) pi = null;
+    if (t.pointerId === pi) resetGesture();
   });
 
-  // ============ 中央オーバーレイ ============
-  var sx2, st2, sw2 = false, passed2 = false, pi2 = null;
-
-  ov2.addEventListener('pointerdown', function(t){
-    if (t.button && t.button !== 0) return;
-    if (pi2 !== null) return;
-    pi2 = t.pointerId;
-    var cv = gv();
-    sx2 = t.clientX;
-    st2 = cv.currentTime;
-    sw2 = false;
-    passed2 = false;
-  });
-
+  // ============ 中央オーバーレイ(シークモード時のみアクティブ) ============
   ov2.addEventListener('pointermove', function(t){
-    if (t.pointerId !== pi2) return;
-    if (passed2) return;
-    var dx = t.clientX - sx2;
-    if (!sw2) {
-      if (Math.abs(dx) < 10) return;
-      sw2 = true;
-    }
+    if (mode !== 'seek') return;
+    if (t.pointerId !== pi) return;
     t.preventDefault();
+    var dx = t.clientX - sx;
     var cv = gv();
     var rect = cv.getBoundingClientRect();
     if (!cv.duration || !isFinite(cv.duration)) return;
@@ -278,26 +271,22 @@
     cv.currentTime = nt;
   });
 
-  ov2.addEventListener('contextmenu', function(e){ e.preventDefault(); });
-  ov2.addEventListener('selectstart', function(e){ e.preventDefault(); });
-
   ov2.addEventListener('pointerup', function(t){
-    if (t.pointerId !== pi2) return;
-    pi2 = null;
-    if (sw2) return;
-    passed2 = true;
-    forwardTap(ov2, t.clientX, t.clientY);
+    if (t.pointerId === pi) resetGesture();
   });
-
   ov2.addEventListener('pointercancel', function(t){
-    if (t.pointerId === pi2) pi2 = null;
+    if (t.pointerId === pi) resetGesture();
   });
 
+  // ============ 組み立て・初期化 ============
   document.body.appendChild(ov);
   document.body.appendChild(ov2);
   d.appendChild(r);
   d.appendChild(tb);
   document.body.appendChild(d);
+
+  // 初期化時にvideoにリスナー仕込む
+  gv();
 
   setTimeout(function(){
     var vr = gv().getBoundingClientRect();
@@ -307,6 +296,7 @@
 
   var t = setInterval(function(){
     pos();
+    gv(); // 動画切り替え時の再リスナー対応
     var cv = gv();
     if (cv) {
       var cur = parseInt(cv.currentTime) || 0;
