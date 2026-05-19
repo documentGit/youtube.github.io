@@ -140,12 +140,22 @@
   }
   pos();
 
-  // ============ タップ転送ヘルパー ============
-  // YouTubeの中央プレイボタンなどはPointerEventの流れを期待するため、
-  // pointerdown→mousedown→pointerup→mouseup→click の順で複合的に発火させる。
+  // タップ転送ヘルパー
+  // 中央プレイボタンはイベントの二重発火で状態が戻ってしまうため、
+  // 当たった場合は特別扱いとしてvideo要素のplay/pauseを直接呼ぶ。
   function forwardTap(overlay, ex, ey){
     overlay.style.pointerEvents = 'none';
     var el = document.elementFromPoint(ex, ey);
+
+    if (el && el.closest && el.closest('.ytp-play-button')) {
+      var cv = gv();
+      if (cv) {
+        if (cv.paused) cv.play(); else cv.pause();
+      }
+      setTimeout(function(){ overlay.style.pointerEvents = 'auto'; }, 400);
+      return;
+    }
+
     if (el) {
       var opts = {
         bubbles: true,
@@ -168,7 +178,6 @@
         el.dispatchEvent(new MouseEvent('click', opts));
       }
     }
-    // ダブルタップの2回目をYouTubeが受け取れるよう十分長く透過
     setTimeout(function(){ overlay.style.pointerEvents = 'auto'; }, 400);
   }
 
