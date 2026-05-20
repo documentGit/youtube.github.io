@@ -3,7 +3,7 @@
   try {
     stage = 'videoId';
     var videoId = new URLSearchParams(location.search).get('v');
-    if (!videoId) { alert('動画ページではありません'); return; }
+    if (!videoId) { prompt('動画ページではありません', ''); return; }
 
     function matchBraces(text, start) {
       var depth = 0, inStr = false, esc = false;
@@ -42,29 +42,27 @@
       var r = await fetch('/watch?v=' + videoId, { credentials: 'include' });
       pr = extractPR(await r.text());
     }
-    if (!pr) { alert('playerResponse 取得失敗'); return; }
+    if (!pr) { prompt('playerResponse 取得失敗', ''); return; }
 
     var tracks = ((pr.captions || {}).playerCaptionsTracklistRenderer || {}).captionTracks || [];
-    if (!tracks.length) { alert('字幕なし'); return; }
+    if (!tracks.length) { prompt('字幕なし', ''); return; }
     var track = tracks.find(x => x.languageCode === 'ja')
              || tracks.find(x => x.kind !== 'asr')
              || tracks[0];
 
-    // ★ ここから細かく分割
     stage = 'show-baseurl';
     var baseUrl = track.baseUrl || '';
-    // まず baseUrl の実体を確認（長いので先頭だけ）
-    if (!confirm('baseUrl 先頭:\n' + baseUrl.slice(0, 300) + '\n\n続行?')) return;
+    var ans1 = prompt('baseUrl (コピーしてOK、中止ならCancel):', baseUrl);
+    if (ans1 === null) return;
 
     stage = 'normalize-url';
-    // スキーマなしなら付ける
     if (baseUrl.startsWith('//')) baseUrl = 'https:' + baseUrl;
     if (baseUrl.startsWith('/')) baseUrl = 'https://www.youtube.com' + baseUrl;
 
     stage = 'validate-url';
     var urlObj;
     try { urlObj = new URL(baseUrl); }
-    catch(e) { alert('URL 不正: ' + e.message + '\n' + baseUrl.slice(0, 200)); return; }
+    catch(e) { prompt('URL 不正: ' + e.message, baseUrl); return; }
     urlObj.searchParams.set('fmt', 'json3');
     var finalUrl = urlObj.toString();
 
@@ -72,15 +70,15 @@
     var capRes = await fetch(finalUrl);
 
     stage = 'fetch-status';
-    if (!capRes.ok) { alert('HTTP ' + capRes.status); return; }
+    if (!capRes.ok) { prompt('HTTP ' + capRes.status, finalUrl); return; }
 
     stage = 'read-text';
     var raw = await capRes.text();
 
     stage = 'inspect-text';
-    if (!raw) { alert('空応答'); return; }
-    // 応答の先頭を見せる（JSON か XML か HTML かを判別）
-    if (!confirm('応答先頭:\n' + raw.slice(0, 300) + '\n\nパース続行?')) return;
+    if (!raw) { prompt('空応答', finalUrl); return; }
+    var ans2 = prompt('応答先頭 500 文字 (続行ならOK):', raw.slice(0, 500));
+    if (ans2 === null) return;
 
     stage = 'parse-json';
     var data = JSON.parse(raw);
@@ -93,8 +91,8 @@
       var x = ev.segs.map(function (g) { return g.utf8; }).join('').replace(/\n/g, ' ').trim();
       return x ? ts + ' ' + x : '';
     }).filter(Boolean);
-    alert('成功: ' + lines.length + '行');
+    prompt('成功: ' + lines.length + '行', lines.slice(0, 5).join('\n'));
   } catch (e) {
-    alert('[' + stage + '] ' + (e && e.message ? e.message : e));
+    prompt('[' + stage + '] エラー', (e && e.message ? e.message : String(e)));
   }
 })();
