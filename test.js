@@ -1,52 +1,92 @@
-javascript:(async()=>{
+(async () => {
+  var stage = 'init';
   try {
-    var videoId = new URL(location.href).searchParams.get('v');
+    stage = 'videoId';
+    var videoId = new URLSearchParams(location.search).get('v');
     if (!videoId) { alert('動画ページではありません'); return; }
 
-    // 1) playerResponse をページ内から拾う(同一オリジン)
-    var pr = window.ytInitialPlayerResponse;
-    if (!pr) {
-      var html = document.documentElement.outerHTML;
-      var m = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\})\s*;/);
-      if (m) { try { pr = JSON.parse(m[1]); } catch(e){} }
+    // ---- JSON 抽出ヘルパー ----
+    function matchBraces(text, start) {
+      var depth = 0, inStr = false, esc = false;
+      for (var i = start; i < text.length; i++) {
+        var c = text[i];
+        if (esc) { esc = false; continue; }
+        if (c === '\\') { esc = true; continue; }
+        if (c === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (c === '{') depth++;
+        else if (c === '}') {
+          depth--;
+          if (depth === 0) return text.substring(start, i + 1);
+        }
+      }
+      return null;
     }
-    // m サイトのページに無ければ /watch を同一オリジン fetch
+    function extractPR(text) {
+      var keys = ['ytInitialPlayerResponse', '"playerResponse"'];
+      for (var k = 0; k < keys.length; k++) {
+        var idx = text.indexOf(keys[k]);
+        while (idx >= 0) {
+          var bi = text.indexOf('{', idx);
+          if (bi < 0 || bi - idx > 200) break;
+          var js = matchBraces(text, bi);
+          if (js) {
+            try {
+              var obj = JSON.parse(js);
+              if (obj && (obj.captions || obj.videoDetails)) return obj;
+            } catch (_) {}
+          }
+          idx = text.indexOf(keys[k], idx + 1);
+        }
+      }
+      return null;
+    }
+
+    stage = 'window.pr';
+    var pr = window.ytInitialPlayerResponse;
+    if (pr && !pr.captions && !pr.videoDetails) pr = null;
+
     if (!pr) {
-      var r = await fetch('/watch?v=' + videoId, {credentials:'include'});
+      stage = 'inline-html';
+      pr = extractPR(document.documentElement.outerHTML);
+    }
+    if (!pr) {
+      stage = 'fetch-watch';
+      var r = await fetch('/watch?v=' + videoId, { credentials: 'include' });
       var t = await r.text();
-      var m2 = t.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\})\s*;/);
-      if (m2) pr = JSON.parse(m2[1]);
+      pr = extractPR(t);
     }
     if (!pr) { alert('playerResponse 取得失敗'); return; }
 
-    // 2) 字幕トラックを選ぶ
-    var tracks = ((pr.captions||{}).playerCaptionsTracklistRenderer||{}).captionTracks || [];
+    stage = 'tracks';
+    var tracks = ((pr.captions || {}).playerCaptionsTracklistRenderer || {}).captionTracks || [];
     if (!tracks.length) { alert('この動画には字幕がありません'); return; }
-    var track = tracks.find(t=>t.languageCode==='ja')
-             || tracks.find(t=>t.kind!=='asr')
+    var track = tracks.find(x => x.languageCode === 'ja')
+             || tracks.find(x => x.kind !== 'asr')
              || tracks[0];
 
-    // 3) 字幕 XML を取得してパース
-    //    baseUrl は www.youtube.com 配下なのでクロスオリジン。
-    //    fmt=json3 を付けると JSON で返り扱いやすい。
-    var url = track.baseUrl + '&fmt=json3';
-    var capRes = await fetch(url);
+    stage = 'fetch-timedtext';
+    var capRes = await fetch(track.baseUrl + '&fmt=json3');
+    if (!capRes.ok) { alert('字幕取得 HTTP ' + capRes.status); return; }
     var data = await capRes.json();
 
-    var lines = (data.events||[]).map(function(ev){
+    stage = 'render';
+    var lines = (data.events || []).map(function (ev) {
       if (!ev.segs) return '';
-      var s = Math.floor((ev.tStartMs||0)/1000);
-      var ts = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
-      var text = ev.segs.map(function(x){return x.utf8;}).join('').replace(/\n/g,' ').trim();
-      return text ? ts + ' ' + text : '';
+      var s = Math.floor((ev.tStartMs || 0) / 1000);
+      var ts = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+      var x = ev.segs.map(function (g) { return g.utf8; }).join('').replace(/\n/g, ' ').trim();
+      return x ? ts + ' ' + x : '';
     }).filter(Boolean);
 
-    // 4) 以後は今のブックマークレットと同じく textarea + 各 LLM 飛ばしボタン
     var title = (document.querySelector('h1') || {}).textContent || document.title;
     var head = 'タイトル: ' + title.trim() + '\nURL: ' + location.href.split('&')[0] + '\n\n';
     var text = head + lines.join('\n');
-    // 既存の UI 生成コードに text を渡せばそのまま動く
-    console.log(text);
-    // ...
-  } catch(e) { alert(e); }
+
+    // とりあえずここで確認
+    alert('成功: ' + lines.length + '行\n\n' + text.slice(0, 200));
+    // ↑ ここを既存の UI 生成（textarea + Claude/ChatGPT ボタン）に差し替え
+  } catch (e) {
+    alert('[' + stage + '] ' + (e && e.message ? e.message : e));
+  }
 })();
