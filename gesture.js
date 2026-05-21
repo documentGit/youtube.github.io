@@ -21,6 +21,7 @@
   // ============ 共通CSS片 ============
   var NO_SELECT = '-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;';
   var OV_STYLE = 'position:fixed;background:transparent;pointer-events:none;touch-action:pan-y;' + NO_SELECT;
+  var LABEL_STYLE = 'position:fixed;background:rgba(0,0,0,0.6);color:#fff;font-size:12px;padding:2px 8px;border-radius:4px;pointer-events:none;z-index:999998;display:none;white-space:nowrap;';
 
   // ============ video要素取得(動画切替検出付き) ============
   function gv(){
@@ -36,7 +37,6 @@
             speedLabel.textContent = '1x';
           }
         });
-        // メタデータ確定時にも即座にUIを更新(初期表示遅延の解消)
         nv.addEventListener('durationchange', function(){ updateUI(); });
         nv.addEventListener('loadedmetadata', function(){ updateUI(); });
         nv._bmHook = 1;
@@ -63,6 +63,22 @@
     return null;
   }
 
+  function showGuide(){
+    divider.style.display = 'block';
+    labelSpeed.style.display = 'block';
+    labelSeek.style.display = 'block';
+    var rect = gv().getBoundingClientRect();
+    var centerX = rect.left + rect.width / 2;
+    labelSpeed.style.left = (centerX - labelSpeed.offsetWidth / 2) + 'px';
+    labelSeek.style.left = (centerX - labelSeek.offsetWidth / 2) + 'px';
+  }
+
+  function hideGuide(){
+    divider.style.display = 'none';
+    labelSpeed.style.display = 'none';
+    labelSeek.style.display = 'none';
+  }
+
   function resetGesture(){
     gestMode = null;
     trackingId = null;
@@ -71,6 +87,7 @@
     uturnDone = false;
     overlayTop.style.pointerEvents = 'none';
     overlayMid.style.pointerEvents = 'none';
+    hideGuide();
   }
 
   function formatTime(sec){
@@ -79,10 +96,6 @@
     return m + ':' + (s < 10 ? '0' + s : s);
   }
 
-  // ============ UI更新ロジック ============
-  // 時刻表示、シークバー位置、速度復帰チェックを1回分実行。
-  // 起動直後に1回呼び、その後は uiTimer で定期実行、
-  // さらに動画のメタデータ確定イベントでも呼んで初期表示の遅延を解消。
   function updateUI(){
     var cv = gv();
     if (!cv) return;
@@ -140,7 +153,7 @@
   helpBtn.textContent = '?';
   helpBtn.style.cssText = 'flex:1;margin-right:4px;padding:2px 0';
   helpBtn.addEventListener('click', function(){
-    alert('上50% スワイプ：速度変更\n上50% 大きく振り戻し：1xに戻す\n中40% スライド：小刻みシーク\nタップ・ダブルタップ・長押し：YouTubeネイティブ\n時間タップ：シークバー表示・非表示');
+    alert('上50% スワイプ：速度変更\n上50% 大きく振り戻し：1xに戻す\n中40% スライド：位置調整\n時間タップ：シークバー表示・非表示');
   });
 
   var closeBtn = document.createElement('button');
@@ -151,6 +164,9 @@
     window.removeEventListener('resize', positionOverlays);
     overlayTop.remove();
     overlayMid.remove();
+    divider.remove();
+    labelSpeed.remove();
+    labelSeek.remove();
     panel.remove();
     active = false;
   });
@@ -167,7 +183,6 @@
   seekBar.max = 1000;
   seekBar.step = 1;
   seekBar.value = 0;
-  // シークバーをデフォルトで表示。非表示にしたい場合は 'display:block' → 'display:none' に。
   seekBar.style.cssText = 'width:300px;display:block;margin-top:4px';
   seekBar.addEventListener('input', function(){
     var cv = gv();
@@ -179,7 +194,6 @@
     seekBar.style.display = seekBar.style.display === 'none' ? 'block' : 'none';
   });
 
-  // パネル本体のドラッグ移動
   row.addEventListener('pointerdown', function(t){
     if (t.button && t.button !== 0) return;
     panOrigLeft = panel.offsetLeft;
@@ -209,6 +223,17 @@
   var overlayMid = document.createElement('div');
   overlayMid.style.cssText = OV_STYLE + 'z-index:999997;';
 
+  var divider = document.createElement('div');
+  divider.style.cssText = 'position:fixed;background:rgba(255,255,255,0.7);height:2px;pointer-events:none;z-index:999998;display:none;box-shadow:0 0 4px rgba(0,0,0,0.5);';
+
+  var labelSpeed = document.createElement('div');
+  labelSpeed.textContent = '速度変更';
+  labelSpeed.style.cssText = LABEL_STYLE;
+
+  var labelSeek = document.createElement('div');
+  labelSeek.textContent = '位置調整';
+  labelSeek.style.cssText = LABEL_STYLE;
+
   function positionOverlays(){
     var rect = gv().getBoundingClientRect();
     overlayTop.style.left = rect.left + 'px';
@@ -219,6 +244,17 @@
     overlayMid.style.top = (rect.top + rect.height * 0.5) + 'px';
     overlayMid.style.width = rect.width + 'px';
     overlayMid.style.height = (rect.height * 0.4) + 'px';
+
+    var midY = rect.top + rect.height * 0.5;
+    divider.style.left = rect.left + 'px';
+    divider.style.top = (midY - 1) + 'px';
+    divider.style.width = rect.width + 'px';
+
+    var centerX = rect.left + rect.width / 2;
+    labelSpeed.style.left = centerX + 'px';
+    labelSpeed.style.top = (midY - 28) + 'px';
+    labelSeek.style.left = centerX + 'px';
+    labelSeek.style.top = (midY + 6) + 'px';
   }
 
   // ============ documentレベル監視(スワイプ検知用) ============
@@ -256,10 +292,12 @@
     if (area === 'speed') {
       gestMode = 'speed';
       overlayTop.style.pointerEvents = 'auto';
+      showGuide();
       try { overlayTop.setPointerCapture(trackingId); } catch(er) {}
     } else if (area === 'seek') {
       gestMode = 'seek';
       overlayMid.style.pointerEvents = 'auto';
+      showGuide();
       try { overlayMid.setPointerCapture(trackingId); } catch(er) {}
     }
   }, docOpts);
@@ -328,6 +366,9 @@
   // ============ 組み立て・初期化 ============
   document.body.appendChild(overlayTop);
   document.body.appendChild(overlayMid);
+  document.body.appendChild(divider);
+  document.body.appendChild(labelSpeed);
+  document.body.appendChild(labelSeek);
   panel.appendChild(row);
   panel.appendChild(seekBar);
   document.body.appendChild(panel);
@@ -341,7 +382,6 @@
     panel.style.left = (rect.left + rect.width / 2 - panel.offsetWidth / 2) + 'px';
   }, 50);
 
-  // 起動直後に1回更新して初期表示を確定、その後は500msごとに更新
   updateUI();
   var uiTimer = setInterval(updateUI, 500);
 })();
