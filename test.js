@@ -21,6 +21,8 @@
   // ============ 共通CSS片 ============
   var NO_SELECT = '-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;';
   var OV_STYLE = 'position:fixed;background:transparent;pointer-events:none;touch-action:pan-y;' + NO_SELECT;
+  // 境界ラベルの共通スタイル
+  var LABEL_STYLE = 'position:fixed;background:rgba(0,0,0,0.6);color:#fff;font-size:12px;padding:2px 8px;border-radius:4px;pointer-events:none;z-index:999998;display:none;white-space:nowrap;';
 
   // ============ video要素取得(動画切替検出付き) ============
   function gv(){
@@ -62,6 +64,18 @@
     return null;
   }
 
+  function showGuide(){
+    divider.style.display = 'block';
+    labelSpeed.style.display = 'block';
+    labelSeek.style.display = 'block';
+  }
+
+  function hideGuide(){
+    divider.style.display = 'none';
+    labelSpeed.style.display = 'none';
+    labelSeek.style.display = 'none';
+  }
+
   function resetGesture(){
     gestMode = null;
     trackingId = null;
@@ -70,7 +84,7 @@
     uturnDone = false;
     overlayTop.style.pointerEvents = 'none';
     overlayMid.style.pointerEvents = 'none';
-    divider.style.display = 'none';  // 横線を非表示
+    hideGuide();
   }
 
   function formatTime(sec){
@@ -148,6 +162,8 @@
     overlayTop.remove();
     overlayMid.remove();
     divider.remove();
+    labelSpeed.remove();
+    labelSeek.remove();
     panel.remove();
     active = false;
   });
@@ -204,11 +220,18 @@
   var overlayMid = document.createElement('div');
   overlayMid.style.cssText = OV_STYLE + 'z-index:999997;';
 
-  // ジェスチャー中のエリア境界線
-  // 上半分(speed)と中央(seek)の境目を視覚化。
-  // 初期は非表示で、ジェスチャー確定時に表示、reset時に非表示。
+  // ジェスチャーガイド: 横線とラベル
+  // 初期は非表示、ジェスチャー確定時に表示、リセット時に非表示。
   var divider = document.createElement('div');
   divider.style.cssText = 'position:fixed;background:rgba(255,255,255,0.7);height:2px;pointer-events:none;z-index:999998;display:none;box-shadow:0 0 4px rgba(0,0,0,0.5);';
+
+  var labelSpeed = document.createElement('div');
+  labelSpeed.textContent = '速度変更';
+  labelSpeed.style.cssText = LABEL_STYLE;
+
+  var labelSeek = document.createElement('div');
+  labelSeek.textContent = 'シーク';
+  labelSeek.style.cssText = LABEL_STYLE;
 
   function positionOverlays(){
     var rect = gv().getBoundingClientRect();
@@ -220,10 +243,39 @@
     overlayMid.style.top = (rect.top + rect.height * 0.5) + 'px';
     overlayMid.style.width = rect.width + 'px';
     overlayMid.style.height = (rect.height * 0.4) + 'px';
-    // 境界線も追従
+
+    // 境界線(動画の縦50%位置)
+    var midY = rect.top + rect.height * 0.5;
     divider.style.left = rect.left + 'px';
-    divider.style.top = (rect.top + rect.height * 0.5 - 1) + 'px';
+    divider.style.top = (midY - 1) + 'px';
     divider.style.width = rect.width + 'px';
+
+    // ラベルを動画の横中央に配置
+    // 横位置は配置後に offsetWidth を使って中央寄せするので、
+    // 先に display 切替後に再計算する必要があるが、ここでは概算配置。
+    // 表示時に showGuide で再計算する。
+    var centerX = rect.left + rect.width / 2;
+    labelSpeed.style.left = centerX + 'px';
+    labelSpeed.style.top = (midY - 28) + 'px';  // 線より28px上
+    labelSeek.style.left = centerX + 'px';
+    labelSeek.style.top = (midY + 6) + 'px';    // 線より6px下
+  }
+
+  // ラベル表示時に正確に中央寄せ(offsetWidthが取れるのはdisplay:block後)
+  function showGuide(){
+    divider.style.display = 'block';
+    labelSpeed.style.display = 'block';
+    labelSeek.style.display = 'block';
+    var rect = gv().getBoundingClientRect();
+    var centerX = rect.left + rect.width / 2;
+    labelSpeed.style.left = (centerX - labelSpeed.offsetWidth / 2) + 'px';
+    labelSeek.style.left = (centerX - labelSeek.offsetWidth / 2) + 'px';
+  }
+
+  function hideGuide(){
+    divider.style.display = 'none';
+    labelSpeed.style.display = 'none';
+    labelSeek.style.display = 'none';
   }
 
   // ============ documentレベル監視(スワイプ検知用) ============
@@ -261,12 +313,12 @@
     if (area === 'speed') {
       gestMode = 'speed';
       overlayTop.style.pointerEvents = 'auto';
-      divider.style.display = 'block';  // 境界線を表示
+      showGuide();
       try { overlayTop.setPointerCapture(trackingId); } catch(er) {}
     } else if (area === 'seek') {
       gestMode = 'seek';
       overlayMid.style.pointerEvents = 'auto';
-      divider.style.display = 'block';  // 境界線を表示
+      showGuide();
       try { overlayMid.setPointerCapture(trackingId); } catch(er) {}
     }
   }, docOpts);
@@ -336,6 +388,8 @@
   document.body.appendChild(overlayTop);
   document.body.appendChild(overlayMid);
   document.body.appendChild(divider);
+  document.body.appendChild(labelSpeed);
+  document.body.appendChild(labelSeek);
   panel.appendChild(row);
   panel.appendChild(seekBar);
   document.body.appendChild(panel);
