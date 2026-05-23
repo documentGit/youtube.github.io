@@ -14,6 +14,12 @@
   var gestStartRate = 1, gestStartTime = 0;
   var maxDx = 0, minDx = 0, uturnDone = false;
 
+  // スライド方向: 'left' / 'right' / null
+  // ジェスチャー中の進行方向を追跡し、矢印アニメーションに使う。
+  var slideDir = null;
+  var arrowToggle = false;  // 矢印アニメーションの状態(false: >, true: >>)
+  var arrowTimer = null;
+
   var panOrigLeft = 0, panOrigTop = 0;
   var panStartX = 0, panStartY = 0;
   var panPointerId = null;
@@ -21,10 +27,9 @@
   // ============ 共通CSS片 ============
   var NO_SELECT = '-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;';
   var OV_STYLE = 'position:fixed;background:transparent;pointer-events:none;touch-action:pan-y;' + NO_SELECT;
-  // 境界ラベルの共通スタイル
   var LABEL_STYLE = 'position:fixed;background:rgba(0,0,0,0.6);color:#fff;font-size:12px;padding:2px 8px;border-radius:4px;pointer-events:none;z-index:999998;display:none;white-space:nowrap;';
 
-  // ============ video要素取得(動画切替検出付き) ============
+  // ============ video要素取得 ============
   function gv(){
     var nv = document.querySelector('video');
     if (nv && (nv !== v || !nv._bmHook)) {
@@ -64,10 +69,76 @@
     return null;
   }
 
+  // ラベルのテキストを現在のモードと方向に応じて更新
+  // 右スライド: 「速度変更 >」または「速度変更 >>」
+  // 左スライド: 「< 速度変更」または「<< 速度変更」
+  // 方向未確定: 元のテキストのまま
+  function updateLabels(){
+    var baseSpeed = '速度変更';
+    var baseSeek = '位置調整';
+    if (slideDir === 'right') {
+      var arr = arrowToggle ? '>>' : '>';
+      labelSpeed.textContent = baseSpeed + ' ' + arr;
+      labelSeek.textContent = baseSeek + ' ' + arr;
+    } else if (slideDir === 'left') {
+      var arr = arrowToggle ? '<<' : '<';
+      labelSpeed.textContent = arr + ' ' + baseSpeed;
+      labelSeek.textContent = arr + ' ' + baseSeek;
+    } else {
+      labelSpeed.textContent = baseSpeed;
+      labelSeek.textContent = baseSeek;
+    }
+    // テキスト幅が変わるので中央寄せを再計算
+    var rect = gv().getBoundingClientRect();
+    var centerX = rect.left + rect.width / 2;
+    labelSpeed.style.left = (centerX - labelSpeed.offsetWidth / 2) + 'px';
+    labelSeek.style.left = (centerX - labelSeek.offsetWidth / 2) + 'px';
+  }
+
+  function startArrowAnimation(){
+    if (arrowTimer) return;
+    arrowToggle = false;
+    updateLabels();
+    arrowTimer = setInterval(function(){
+      arrowToggle = !arrowToggle;
+      updateLabels();
+    }, 500);
+  }
+
+  function stopArrowAnimation(){
+    if (arrowTimer) {
+      clearInterval(arrowTimer);
+      arrowTimer = null;
+    }
+    slideDir = null;
+    updateLabels();
+  }
+
+  // 進行方向が変わったかチェックして、必要なら矢印アニメを更新
+  function updateSlideDir(dx){
+    var newDir = null;
+    if (dx > 5) newDir = 'right';
+    else if (dx < -5) newDir = 'left';
+    // 中央付近(±5px)は方向確定せず維持
+
+    if (newDir && newDir !== slideDir) {
+      slideDir = newDir;
+      arrowToggle = false;
+      updateLabels();
+      if (!arrowTimer) {
+        arrowTimer = setInterval(function(){
+          arrowToggle = !arrowToggle;
+          updateLabels();
+        }, 500);
+      }
+    }
+  }
+
   function showGuide(){
     divider.style.display = 'block';
     labelSpeed.style.display = 'block';
     labelSeek.style.display = 'block';
+    updateLabels();
   }
 
   function hideGuide(){
@@ -84,6 +155,7 @@
     uturnDone = false;
     overlayTop.style.pointerEvents = 'none';
     overlayMid.style.pointerEvents = 'none';
+    stopArrowAnimation();
     hideGuide();
   }
 
@@ -150,7 +222,7 @@
   helpBtn.textContent = '?';
   helpBtn.style.cssText = 'flex:1;margin-right:4px;padding:2px 0';
   helpBtn.addEventListener('click', function(){
-    alert('上50% スワイプ：速度変更\n上50% 大きく振り戻し：1xに戻す\n中40% スライド：小刻みシーク\nタップ・ダブルタップ・長押し：YouTubeネイティブ\n時間タップ：シークバー表示・非表示');
+    alert('上50% スワイプ：速度変更\n上50% 大きく振り戻し：1xに戻す\n中40% スライド：位置調整\n時間タップ：シークバー表示・非表示');
   });
 
   var closeBtn = document.createElement('button');
@@ -158,6 +230,7 @@
   closeBtn.style.cssText = 'flex:1;padding:2px 0';
   closeBtn.addEventListener('click', function(){
     clearInterval(uiTimer);
+    stopArrowAnimation();
     window.removeEventListener('resize', positionOverlays);
     overlayTop.remove();
     overlayMid.remove();
@@ -220,8 +293,6 @@
   var overlayMid = document.createElement('div');
   overlayMid.style.cssText = OV_STYLE + 'z-index:999997;';
 
-  // ジェスチャーガイド: 横線とラベル
-  // 初期は非表示、ジェスチャー確定時に表示、リセット時に非表示。
   var divider = document.createElement('div');
   divider.style.cssText = 'position:fixed;background:rgba(255,255,255,0.7);height:2px;pointer-events:none;z-index:999998;display:none;box-shadow:0 0 4px rgba(0,0,0,0.5);';
 
@@ -230,7 +301,7 @@
   labelSpeed.style.cssText = LABEL_STYLE;
 
   var labelSeek = document.createElement('div');
-  labelSeek.textContent = 'シーク';
+  labelSeek.textContent = '位置調整';
   labelSeek.style.cssText = LABEL_STYLE;
 
   function positionOverlays(){
@@ -244,38 +315,16 @@
     overlayMid.style.width = rect.width + 'px';
     overlayMid.style.height = (rect.height * 0.4) + 'px';
 
-    // 境界線(動画の縦50%位置)
     var midY = rect.top + rect.height * 0.5;
     divider.style.left = rect.left + 'px';
     divider.style.top = (midY - 1) + 'px';
     divider.style.width = rect.width + 'px';
 
-    // ラベルを動画の横中央に配置
-    // 横位置は配置後に offsetWidth を使って中央寄せするので、
-    // 先に display 切替後に再計算する必要があるが、ここでは概算配置。
-    // 表示時に showGuide で再計算する。
     var centerX = rect.left + rect.width / 2;
     labelSpeed.style.left = centerX + 'px';
-    labelSpeed.style.top = (midY - 28) + 'px';  // 線より28px上
+    labelSpeed.style.top = (midY - 28) + 'px';
     labelSeek.style.left = centerX + 'px';
-    labelSeek.style.top = (midY + 6) + 'px';    // 線より6px下
-  }
-
-  // ラベル表示時に正確に中央寄せ(offsetWidthが取れるのはdisplay:block後)
-  function showGuide(){
-    divider.style.display = 'block';
-    labelSpeed.style.display = 'block';
-    labelSeek.style.display = 'block';
-    var rect = gv().getBoundingClientRect();
-    var centerX = rect.left + rect.width / 2;
-    labelSpeed.style.left = (centerX - labelSpeed.offsetWidth / 2) + 'px';
-    labelSeek.style.left = (centerX - labelSeek.offsetWidth / 2) + 'px';
-  }
-
-  function hideGuide(){
-    divider.style.display = 'none';
-    labelSpeed.style.display = 'none';
-    labelSeek.style.display = 'none';
+    labelSeek.style.top = (midY + 6) + 'px';
   }
 
   // ============ documentレベル監視(スワイプ検知用) ============
@@ -356,6 +405,8 @@
       tgtRate = nr;
       speedLabel.textContent = nr + 'x';
     }
+    // 矢印方向の更新(開始位置からの相対dxで判定)
+    updateSlideDir(dx);
   });
 
   overlayTop.addEventListener('pointerup', function(t){
@@ -375,6 +426,8 @@
     var rect = cv.getBoundingClientRect();
     var nt = gestStartTime + dx / rect.width * cv.duration / 8;
     cv.currentTime = Math.max(0, Math.min(cv.duration, nt));
+    // 矢印方向の更新
+    updateSlideDir(dx);
   });
 
   overlayMid.addEventListener('pointerup', function(t){
