@@ -14,10 +14,8 @@
   var gestStartRate = 1, gestStartTime = 0;
   var maxDx = 0, minDx = 0, uturnDone = false;
 
-  // スライド方向: 'left' / 'right' / null
-  // ジェスチャー中の進行方向を追跡し、矢印アニメーションに使う。
   var slideDir = null;
-  var arrowToggle = false;  // 矢印アニメーションの状態(false: >, true: >>)
+  var arrowToggle = false;
   var arrowTimer = null;
 
   var panOrigLeft = 0, panOrigTop = 0;
@@ -28,6 +26,8 @@
   var NO_SELECT = '-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;';
   var OV_STYLE = 'position:fixed;background:transparent;pointer-events:none;touch-action:pan-y;' + NO_SELECT;
   var LABEL_STYLE = 'position:fixed;background:rgba(0,0,0,0.6);color:#fff;font-size:12px;padding:2px 8px;border-radius:4px;pointer-events:none;z-index:999998;display:none;white-space:nowrap;';
+  // 矢印用のspanスタイル: 固定幅で確保し本文位置が動かないようにする
+  var ARROW_STYLE = 'display:inline-block;width:22px;text-align:center;';
 
   // ============ video要素取得 ============
   function gv(){
@@ -69,30 +69,25 @@
     return null;
   }
 
-  // ラベルのテキストを現在のモードと方向に応じて更新
-  // 右スライド: 「速度変更 >」または「速度変更 >>」
-  // 左スライド: 「< 速度変更」または「<< 速度変更」
-  // 方向未確定: 元のテキストのまま
-  function updateLabels(){
-    var baseSpeed = '速度変更';
-    var baseSeek = '位置調整';
-    if (slideDir === 'right') {
-      var arr = arrowToggle ? '>>' : '>';
-      labelSpeed.textContent = baseSpeed + ' ' + arr;
-      labelSeek.textContent = baseSeek + ' ' + arr;
-    } else if (slideDir === 'left') {
-      var arr = arrowToggle ? '<<' : '<';
-      labelSpeed.textContent = arr + ' ' + baseSpeed;
-      labelSeek.textContent = arr + ' ' + baseSeek;
-    } else {
-      labelSpeed.textContent = baseSpeed;
-      labelSeek.textContent = baseSeek;
+  // 指定ラベルの矢印を設定。アクティブモードでなければ空。
+  function setArrows(arrowLeftEl, arrowRightEl, isActive){
+    if (!isActive || !slideDir) {
+      arrowLeftEl.textContent = '';
+      arrowRightEl.textContent = '';
+      return;
     }
-    // テキスト幅が変わるので中央寄せを再計算
-    var rect = gv().getBoundingClientRect();
-    var centerX = rect.left + rect.width / 2;
-    labelSpeed.style.left = (centerX - labelSpeed.offsetWidth / 2) + 'px';
-    labelSeek.style.left = (centerX - labelSeek.offsetWidth / 2) + 'px';
+    if (slideDir === 'right') {
+      arrowLeftEl.textContent = '';
+      arrowRightEl.textContent = arrowToggle ? '>>' : '>';
+    } else {
+      arrowLeftEl.textContent = arrowToggle ? '<<' : '<';
+      arrowRightEl.textContent = '';
+    }
+  }
+
+  function updateLabels(){
+    setArrows(speedArrowL, speedArrowR, gestMode === 'speed');
+    setArrows(seekArrowL, seekArrowR, gestMode === 'seek');
   }
 
   function startArrowAnimation(){
@@ -114,12 +109,10 @@
     updateLabels();
   }
 
-  // 進行方向が変わったかチェックして、必要なら矢印アニメを更新
   function updateSlideDir(dx){
     var newDir = null;
     if (dx > 5) newDir = 'right';
     else if (dx < -5) newDir = 'left';
-    // 中央付近(±5px)は方向確定せず維持
 
     if (newDir && newDir !== slideDir) {
       slideDir = newDir;
@@ -134,11 +127,16 @@
     }
   }
 
+  // ラベル表示時に正確に中央寄せ
   function showGuide(){
     divider.style.display = 'block';
     labelSpeed.style.display = 'block';
     labelSeek.style.display = 'block';
     updateLabels();
+    var rect = gv().getBoundingClientRect();
+    var centerX = rect.left + rect.width / 2;
+    labelSpeed.style.left = (centerX - labelSpeed.offsetWidth / 2) + 'px';
+    labelSeek.style.left = (centerX - labelSeek.offsetWidth / 2) + 'px';
   }
 
   function hideGuide(){
@@ -296,13 +294,34 @@
   var divider = document.createElement('div');
   divider.style.cssText = 'position:fixed;background:rgba(255,255,255,0.7);height:2px;pointer-events:none;z-index:999998;display:none;box-shadow:0 0 4px rgba(0,0,0,0.5);';
 
-  var labelSpeed = document.createElement('div');
-  labelSpeed.textContent = '速度変更';
-  labelSpeed.style.cssText = LABEL_STYLE;
+  // ガイドラベル
+  // 構造: [左矢印span][本文span][右矢印span]
+  // 矢印spanは固定幅(ARROW_STYLE)で確保、空でも幅は維持されるので
+  // 本文の位置は動かない。
+  function buildLabel(text){
+    var label = document.createElement('div');
+    label.style.cssText = LABEL_STYLE;
+    var arrowL = document.createElement('span');
+    arrowL.style.cssText = ARROW_STYLE;
+    var body = document.createElement('span');
+    body.textContent = text;
+    var arrowR = document.createElement('span');
+    arrowR.style.cssText = ARROW_STYLE;
+    label.appendChild(arrowL);
+    label.appendChild(body);
+    label.appendChild(arrowR);
+    return { el: label, left: arrowL, right: arrowR };
+  }
 
-  var labelSeek = document.createElement('div');
-  labelSeek.textContent = '位置調整';
-  labelSeek.style.cssText = LABEL_STYLE;
+  var lblSpd = buildLabel('速度変更');
+  var labelSpeed = lblSpd.el;
+  var speedArrowL = lblSpd.left;
+  var speedArrowR = lblSpd.right;
+
+  var lblSk = buildLabel('位置調整');
+  var labelSeek = lblSk.el;
+  var seekArrowL = lblSk.left;
+  var seekArrowR = lblSk.right;
 
   function positionOverlays(){
     var rect = gv().getBoundingClientRect();
@@ -397,15 +416,14 @@
     if (uturnDone) {
       cv.playbackRate = 1;
       tgtRate = 1;
-      speedLabel.textContent = '1x';
+      speedLabel.textContent = '1x';  // 表示パネルの方
     } else {
       var nr = Math.max(0, Math.min(5, gestStartRate + dx / 200));
       nr = Math.round(nr * 10) / 10;
       cv.playbackRate = nr;
       tgtRate = nr;
-      speedLabel.textContent = nr + 'x';
+      speedLabel.textContent = nr + 'x';  // 表示パネルの方
     }
-    // 矢印方向の更新(開始位置からの相対dxで判定)
     updateSlideDir(dx);
   });
 
@@ -426,7 +444,6 @@
     var rect = cv.getBoundingClientRect();
     var nt = gestStartTime + dx / rect.width * cv.duration / 8;
     cv.currentTime = Math.max(0, Math.min(cv.duration, nt));
-    // 矢印方向の更新
     updateSlideDir(dx);
   });
 
