@@ -1,9 +1,10 @@
 (function(){
   // m.youtube.com → www.youtube.com リダイレクト
-  // 元のホスト名をsessionStorageに保存して、戻るボタンで使う
+  // 元のホスト名をURLパラメータに埋め込んで戻るボタンで使う
+  // (sessionStorageはホスト間で共有されない場合があるためURLに載せる)
   if (location.host !== 'www.youtube.com') {
-    sessionStorage.setItem('bml_origHost', location.host);
     var u = new URL(location);
+    u.searchParams.set('bml_back', location.host);
     u.host = 'www.youtube.com';
     u.searchParams.set('app', 'desktop');
     location.href = u;
@@ -51,8 +52,6 @@
     var q = '以下のYouTube動画の文字起こしを要約してください\n\n' + text;
     var prompt2 = '以下に貼り付けるYouTube動画(' + title + ')の文字起こしを要約してください。本文はクリップボードにコピー済みなので、この後すぐ貼り付けます。';
 
-    // ボタン共通スタイル
-    // ボーダーなし、色差で区別。
     var st = 'position:fixed;top:0;height:10vh;z-index:2147483647;font-size:13px;border:none;border-radius:0;box-sizing:border-box;margin:0;';
 
     var bs = document.createElement('button');
@@ -97,8 +96,6 @@
       }
     };
 
-    // Gemini: URLパラメータ未対応のため常にコピー+ページを開く方式
-    // 本文だけでなくプロンプトも含めてコピーするので、貼り付けるだけで完結
     var bgm = document.createElement('button');
     bgm.textContent = 'Gemini';
     bgm.style.cssText = st + 'left:60vw;width:20vw;background:#1c69d4;color:#fff;';
@@ -111,22 +108,20 @@
     };
 
     // 戻るボタン
-    // 起動時に保存した元ホスト(m.youtube.comなど)に戻す。
-    // 元がwww.youtube.comだった(リダイレクトしなかった)場合は、UIだけ閉じる。
+    // URLパラメータ bml_back に元のホスト名が入っていればそれに戻す。
+    // 入っていなければ単にUIを閉じる。
     var bc = document.createElement('button');
     bc.textContent = '戻る';
     bc.style.cssText = st + 'right:0;width:20vw;background:#eee;';
     bc.onclick = function(){
-      var origHost = sessionStorage.getItem('bml_origHost');
+      var u = new URL(location);
+      var origHost = u.searchParams.get('bml_back');
       if (origHost && origHost !== 'www.youtube.com') {
-        // 元のモバイルサイトなどに戻す
-        sessionStorage.removeItem('bml_origHost');
-        var u = new URL(location);
         u.host = origHost;
         u.searchParams.delete('app');
+        u.searchParams.delete('bml_back');
         location.href = u;
       } else {
-        // UIだけ閉じる
         ta.remove(); bs.remove(); bcl.remove(); bgpt.remove(); bgm.remove(); bc.remove();
       }
     };
