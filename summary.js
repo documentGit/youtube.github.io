@@ -1,7 +1,10 @@
 (function(){
   // m.youtube.com → www.youtube.com リダイレクト
+  // 元のホスト名をURLパラメータに埋め込んで戻るボタンで使う
+  // (sessionStorageはホスト間で共有されない場合があるためURLに載せる)
   if (location.host !== 'www.youtube.com') {
     var u = new URL(location);
+    u.searchParams.set('bml_back', location.host);
     u.host = 'www.youtube.com';
     u.searchParams.set('app', 'desktop');
     location.href = u;
@@ -49,9 +52,6 @@
     var q = '以下のYouTube動画の文字起こしを要約してください\n\n' + text;
     var prompt2 = '以下に貼り付けるYouTube動画(' + title + ')の文字起こしを要約してください。本文はクリップボードにコピー済みなので、この後すぐ貼り付けます。';
 
-    // ボタン共通スタイル
-    // ボーダーなし、色差で区別。
-    // 右側だけ線にしたい場合は 'border:none' を 'border:none;border-right:1px solid #888' に。
     var st = 'position:fixed;top:0;height:10vh;z-index:2147483647;font-size:13px;border:none;border-radius:0;box-sizing:border-box;margin:0;';
 
     var bs = document.createElement('button');
@@ -107,11 +107,23 @@
       window.open('https://gemini.google.com/app', '_blank');
     };
 
+    // 戻るボタン
+    // URLパラメータ bml_back に元のホスト名が入っていればそれに戻す。
+    // 入っていなければ単にUIを閉じる。
     var bc = document.createElement('button');
-    bc.textContent = '閉じる';
+    bc.textContent = '戻る';
     bc.style.cssText = st + 'right:0;width:20vw;background:#eee;';
     bc.onclick = function(){
-      ta.remove(); bs.remove(); bcl.remove(); bgpt.remove(); bgm.remove(); bc.remove();
+      var u = new URL(location);
+      var origHost = u.searchParams.get('bml_back');
+      if (origHost && origHost !== 'www.youtube.com') {
+        u.host = origHost;
+        u.searchParams.delete('app');
+        u.searchParams.delete('bml_back');
+        location.href = u;
+      } else {
+        ta.remove(); bs.remove(); bcl.remove(); bgpt.remove(); bgm.remove(); bc.remove();
+      }
     };
 
     var ta = document.createElement('textarea');
