@@ -1,7 +1,6 @@
 (function(){
   // m.youtube.com → www.youtube.com リダイレクト
   // 元のホスト名をURLパラメータに埋め込んで戻るボタンで使う
-  // (sessionStorageはホスト間で共有されない場合があるためURLに載せる)
   if (location.host !== 'www.youtube.com') {
     var u = new URL(location);
     u.searchParams.set('bml_back', location.host);
@@ -52,6 +51,30 @@
     var q = '以下のYouTube動画の文字起こしを要約してください\n\n' + text;
     var prompt2 = '以下に貼り付けるYouTube動画(' + title + ')の文字起こしを要約してください。本文はクリップボードにコピー済みなので、この後すぐ貼り付けます。';
 
+    // ============ 共通関数: 戻る処理 ============
+    // bml_backパラメータがあれば元ホストに戻す。
+    // なければUIだけ閉じる(closeUIフラグでDOM削除を制御)。
+    function goBackOrClose(closeUI){
+      var bu = new URL(location);
+      var origHost = bu.searchParams.get('bml_back');
+      if (origHost && origHost !== 'www.youtube.com') {
+        bu.host = origHost;
+        bu.searchParams.delete('app');
+        bu.searchParams.delete('bml_back');
+        location.href = bu;
+      } else if (closeUI) {
+        ta.remove(); bs.remove(); bcl.remove(); bgpt.remove(); bgm.remove(); bc.remove();
+      }
+    }
+
+    // 共通関数: 新規タブで開いてから戻る
+    // window.openの直後に遷移するとタブ読み込みがキャンセルされることがあるため
+    // 100ms待ってから戻る処理を呼ぶ。
+    function openAndGoBack(url){
+      window.open(url, '_blank');
+      setTimeout(function(){ goBackOrClose(false); }, 100);
+    }
+
     var st = 'position:fixed;top:0;height:10vh;z-index:2147483647;font-size:13px;border:none;border-radius:0;box-sizing:border-box;margin:0;';
 
     var bs = document.createElement('button');
@@ -70,13 +93,13 @@
     bcl.onclick = function(){
       var u = 'https://claude.ai/new?q=' + encodeURIComponent(q);
       if (u.length < 2000) {
-        window.open(u, '_blank');
+        openAndGoBack(u);
       } else {
         ta.value = text;
         ta.focus();
         ta.select();
         try { document.execCommand('copy'); } catch(e) {}
-        window.open('https://claude.ai/new?q=' + encodeURIComponent(prompt2), '_blank');
+        openAndGoBack('https://claude.ai/new?q=' + encodeURIComponent(prompt2));
       }
     };
 
@@ -86,13 +109,13 @@
     bgpt.onclick = function(){
       var u = 'https://chatgpt.com/?q=' + encodeURIComponent(q);
       if (u.length < 2000) {
-        window.open(u, '_blank');
+        openAndGoBack(u);
       } else {
         ta.value = text;
         ta.focus();
         ta.select();
         try { document.execCommand('copy'); } catch(e) {}
-        window.open('https://chatgpt.com/?q=' + encodeURIComponent(prompt2), '_blank');
+        openAndGoBack('https://chatgpt.com/?q=' + encodeURIComponent(prompt2));
       }
     };
 
@@ -104,26 +127,14 @@
       ta.focus();
       ta.select();
       try { document.execCommand('copy'); } catch(e) {}
-      window.open('https://gemini.google.com/app', '_blank');
+      openAndGoBack('https://gemini.google.com/app');
     };
 
-    // 戻るボタン
-    // URLパラメータ bml_back に元のホスト名が入っていればそれに戻す。
-    // 入っていなければ単にUIを閉じる。
     var bc = document.createElement('button');
     bc.textContent = '戻る';
     bc.style.cssText = st + 'right:0;width:20vw;background:#eee;';
     bc.onclick = function(){
-      var u = new URL(location);
-      var origHost = u.searchParams.get('bml_back');
-      if (origHost && origHost !== 'www.youtube.com') {
-        u.host = origHost;
-        u.searchParams.delete('app');
-        u.searchParams.delete('bml_back');
-        location.href = u;
-      } else {
-        ta.remove(); bs.remove(); bcl.remove(); bgpt.remove(); bgm.remove(); bc.remove();
-      }
+      goBackOrClose(true);
     };
 
     var ta = document.createElement('textarea');
