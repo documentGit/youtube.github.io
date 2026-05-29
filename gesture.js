@@ -182,7 +182,7 @@
   }
 
   var gSpd = buildGuide('速度変更');
-  var gSk = buildGuide('位置調整');
+  var gSk = buildGuide('再生位置');
 
   // ============================================================
   // UI制御関数: ガイド表示・矢印アニメ
@@ -347,7 +347,7 @@
   });
 
   helpBtn.addEventListener('click', function(){
-    alert('上50% スワイプ：速度変更\n上50% 大きく振り戻し：1xに戻す\n中40% スライド：位置調整\n時間タップ：シークバー表示・非表示');
+    alert('上50% スワイプ：速度変更\n上50% 大きく振り戻し：1xに戻す\n中40% スライド：再生位置\n時間タップ：シークバー表示・非表示');
   });
 
   closeBtn.addEventListener('click', function(){
@@ -479,7 +479,9 @@
       tgtRate = 1;
       speedDisp.textContent = '1x';
     } else {
-      var nr = Math.max(0, Math.min(5, gestStartRate + dx / 200));
+      // 上限10倍。dx/120 で約1080px動かして0→10x(画面端〜端で十分届く感度)。
+      // 感度を変えたい場合は分母120を調整(小さいほど敏感)。
+      var nr = Math.max(0, Math.min(10, gestStartRate + dx / 120));
       nr = Math.round(nr * 10) / 10;
       cv.playbackRate = nr;
       tgtRate = nr;
@@ -495,7 +497,7 @@
     if (t.pointerId === trackingId) resetGesture();
   });
 
-  // 中央: 位置調整
+  // 中央: 再生位置
   overlayMid.addEventListener('pointermove', function(t){
     if (gestMode !== 'seek' || t.pointerId !== trackingId) return;
     t.preventDefault();
