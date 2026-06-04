@@ -48,8 +48,8 @@
     var url = location.href.split('&')[0];
     var head = 'タイトル: ' + title + '\nチャンネル: ' + ch + '\nURL: ' + url + '\n\n';
     var text = head + lines.join('\n');
-    var q = '以下のYouTube動画の文字起こしを要約してください\n\n' + text;
-    var prompt2 = '以下に貼り付けるYouTube動画(' + title + ')の文字起こしを要約してください。本文はクリップボードにコピー済みなので、この後すぐ貼り付けます。';
+    var q = '以下のYouTube動画の文字起こし詳しくまとめてください\n\n' + text;
+    var prompt2 = '以下に貼り付けるYouTube動画(' + title + ')の文字起こしを詳しくまとめてください。本文はクリップボードにコピー済みなので、この後すぐ貼り付けます。';
 
     // ============ 共通関数: 戻る処理 ============
     // bml_backパラメータがあれば元ホストに戻す。
